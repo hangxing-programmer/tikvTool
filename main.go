@@ -19,7 +19,8 @@ type TiKVClient struct {
 }
 
 func main() {
-	//取消输出底层日志export TIKV_CLIENT_LOG_LEVEL=error
+	//Linux环境有效:取消输出底层日志export TIKV_CLIENT_LOG_LEVEL=error,
+	os.Setenv("TIKV_CLIENT_LOG_LEVEL", "error")
 	line := liner.NewLiner()
 	defer line.Close()
 
