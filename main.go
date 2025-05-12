@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/peterh/liner"
+	"github.com/pingcap/log"
 	"github.com/tikv/client-go/v2/txnkv"
 	"github.com/tikv/client-go/v2/txnkv/transaction"
-	"log"
+	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"strconv"
@@ -19,8 +20,7 @@ type TiKVClient struct {
 }
 
 func main() {
-	//Linux环境有效:取消输出底层日志export TIKV_CLIENT_LOG_LEVEL=error,
-	os.Setenv("TIKV_CLIENT_LOG_LEVEL", "error")
+
 	line := liner.NewLiner()
 	defer line.Close()
 
@@ -35,13 +35,14 @@ func main() {
 	endpoints = strings.TrimSpace(endpoints)
 	addrs := strings.Split(endpoints, ",")
 
+	log.SetLevel(zap.ErrorLevel)
 	client, err := txnkv.NewClient(addrs)
 	if err != nil {
 		panic(err)
 	}
 	defer client.Close()
 	if err != nil {
-		log.Fatalf("连接失败: %v", err)
+		//log.Fatalf("连接失败: %v", err)
 		return
 	}
 	fmt.Println("成功连接到TiKV集群...")
