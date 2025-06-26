@@ -47,6 +47,5 @@ func TimeToTS(physical string) uint64 {
 		fmt.Println("解析失败:", err)
 		return 0
 	}
-	fmt.Println("start time (CST): ", startTime)
 	return uint64(startTime.UnixMilli()) << 18
 }
