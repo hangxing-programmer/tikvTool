@@ -1,7 +1,11 @@
 package utils
 
 import (
+	"context"
 	"fmt"
+	"github.com/tikv/client-go/v2/txnkv"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -48,4 +52,21 @@ func TimeToTS(physical string) uint64 {
 		return 0
 	}
 	return uint64(startTime.UnixMilli()) << 18
+}
+
+func DataAdd() {
+	client, _ := txnkv.NewClient(strings.Split("10.0.11.33:2379,10.0.11.34:2379,10.0.11.35:2379", ","))
+	txn, _ := client.Begin()
+	baseTime, err := time.Parse("2006-01-02 15:04:05", "2025-07-01 10:10:10")
+	if err != nil {
+		fmt.Println("Error parsing time:", err)
+		return
+	}
+	str := "OS/T03/test/"
+	for i := 0; i < 10000; i++ {
+		ts := baseTime.Add(time.Duration(i) * time.Second)
+		tsString := ts.Format("2006-01-02 15:04:05")
+		_ = txn.Set([]byte(str+strconv.FormatInt(int64(TimeToTS(tsString)), 10)+"1000000"), []byte("test"))
+	}
+	_ = txn.Commit(context.Background())
 }

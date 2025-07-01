@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"tikv/utils"
+	"time"
 )
 
 type TiKVClient struct {
@@ -96,7 +97,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				fmt.Println("使用方法: set <key> <value>")
 				continue
 			}
-			c.handleSet(cmd[1], strings.Join(cmd[2:], " "))
+			c.HandleSet(cmd[1], strings.Join(cmd[2:], " "))
 		case "del":
 			if len(cmd) < 2 {
 				fmt.Println("使用方法: del <key>")
@@ -269,7 +270,7 @@ func (c *TiKVClient) handleListRange(key1, key2, json string, limit int) {
 	}
 }
 
-func (c *TiKVClient) handleSet(key, value string) {
+func (c *TiKVClient) HandleSet(key, value string) {
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
 		return txn.Set([]byte(key), []byte(value))
 	})
@@ -342,8 +343,8 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
 	deletedTotal := 0
-	//Runtime/RequestLog/4589935026550865951000001
-	//2025-06-26-16:37:45
+	startTime := time.Now()
+
 	if strings.Contains(start, ":") && strings.Contains(end, ":") {
 		s1 := start[strings.LastIndex(start, "/")+1:]
 		s2 := end[strings.LastIndex(end, "/")+1:]
@@ -351,14 +352,15 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 		s2 = s2[:strings.LastIndex(s2, "-")] + " " + s2[strings.LastIndex(s2, "-")+1:]
 		startTS := utils.TimeToTS(s1)
 		endTS := utils.TimeToTS(s2)
-		start = strconv.Itoa(int(startTS)) + "1000000"
-		end = strconv.Itoa(int(endTS)) + "1000001"
+		start = start[0:strings.LastIndex(start, "/")+1] + strconv.Itoa(int(startTS)) + "1000000"
+		end = end[0:strings.LastIndex(end, "/")+1] + strconv.Itoa(int(endTS)) + "1000001"
 	}
 	txn, err := c.Client.Begin()
 	if err != nil {
 		fmt.Printf("事务开启失败: %v\n", err)
 		return
 	}
+	defer txn.Rollback()
 	iter, err := txn.Iter([]byte(start), []byte(end))
 	if err != nil {
 		fmt.Printf("迭代err: %v\n", err)
@@ -382,12 +384,12 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 				fmt.Printf("iter.Next err: %v\n", err)
 				break
 			}
-			if deletedTotal%100 == 0 {
+			if deletedTotal%1000 == 0 {
 				err = txn.Commit(context.Background())
 				if err != nil {
 					fmt.Printf("事务提交失败: %v\n", err)
 				} else {
-					fmt.Println("已删除:100")
+					fmt.Println("已删除:1000,事务二次开启...")
 					txn, err = c.Client.Begin()
 					if err != nil {
 						fmt.Printf("事务二次开启失败: %v\n", err)
@@ -397,5 +399,13 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 			}
 		}
 	}
-	fmt.Println("总计删除:", deletedTotal)
+	// 提交剩余的事务
+	if deletedTotal%1000 != 0 {
+		err = txn.Commit(context.Background())
+		if err != nil {
+			fmt.Printf("最后一批事务提交失败: %v\n", err)
+			return
+		}
+	}
+	fmt.Println("已删除总计:", deletedTotal, "耗时:", time.Since(startTime))
 }
