@@ -125,10 +125,13 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 
 		case "find":
 			if len(cmd) < 2 {
-				fmt.Println("使用方法: find <key>")
+				fmt.Println("使用方法: find <key> -json")
 				continue
+			} else if len(cmd) == 2 {
+				c.findLike(cmd[1], false)
+			} else if strings.Contains(cmd[2], "-json") {
+				c.findLike(cmd[1], true)
 			}
-			c.findLike(cmd[1])
 		case "exit":
 			return
 		default:
@@ -223,6 +226,9 @@ func (c *TiKVClient) handleListRange(key1, key2, json string, limit int) {
 
 	// 如果key2为空，则计算key1的下一个键
 	if key2 == "" {
+		if !strings.Contains(key1, "/") {
+			key1 = key1 + "/"
+		}
 		key2 = key1[0:strings.LastIndex(key1, "/")] + "0"
 		//key2Bytes := []byte(key1)
 		//for i := len(key2Bytes) - 1; i >= 0; i-- {
@@ -309,14 +315,14 @@ func (c *TiKVClient) handleDelete(key string) {
 	fmt.Println("键已删除")
 }
 
-func (c *TiKVClient) findLike(key string) {
+func (c *TiKVClient) findLike(key string, json bool) {
 	// 创建中断信号通道
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
 
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
-		iter, err := txn.Iter(nil, nil)
+		iter, err := txn.Iter([]byte(key), nil)
 		if err != nil {
 			fmt.Printf("创建迭代器失败: %v\n", err)
 			return err
@@ -332,11 +338,15 @@ func (c *TiKVClient) findLike(key string) {
 			default:
 				k := iter.Key()
 				v := iter.Value()
-
-				if strings.Contains(string(k), key) {
+				if json && strings.Contains(string(k), key) {
 					fmt.Printf("%s", string(k))
-					fmt.Printf(" Value = %s\n", string(v))
+					fmt.Printf("  Value = %s\n", string(v))
 					count++
+				} else {
+					if strings.Contains(string(k), key) {
+						fmt.Printf("%s\n", string(k))
+						count++
+					}
 				}
 			}
 			if err := iter.Next(); err != nil {
