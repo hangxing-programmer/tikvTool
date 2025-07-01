@@ -355,57 +355,65 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 		start = start[0:strings.LastIndex(start, "/")+1] + strconv.Itoa(int(startTS)) + "1000000"
 		end = end[0:strings.LastIndex(end, "/")+1] + strconv.Itoa(int(endTS)) + "1000001"
 	}
-	txn, err := c.Client.Begin()
-	if err != nil {
-		fmt.Printf("事务开启失败: %v\n", err)
-		return
-	}
-	defer txn.Rollback()
-	iter, err := txn.Iter([]byte(start), []byte(end))
-	if err != nil {
-		fmt.Printf("迭代err: %v\n", err)
-		return
-	}
-	defer iter.Close()
-	for iter.Valid() {
-		select {
-		case <-sigCh:
-			fmt.Println("\n操作已取消")
-			fmt.Printf("总计删除:%d", deletedTotal)
+	batchSize := 3000
+	processedInBatch := 0
+	startKey := []byte(start)
+	endKey := []byte(end)
+
+	for {
+		txn, err := c.Client.Begin()
+		if err != nil {
+			fmt.Printf("事务开启失败: %v\n", err)
 			return
-		default:
-			err = txn.Delete(iter.Key())
-			if err != nil {
-				fmt.Printf("删除key=%s失败: %v\n", iter.Key(), err)
-			} else {
-				deletedTotal++
-			}
-			if err = iter.Next(); err != nil {
-				fmt.Printf("iter.Next err: %v\n", err)
-				break
-			}
-			if deletedTotal%1000 == 0 {
-				err = txn.Commit(context.Background())
+		}
+		defer txn.Rollback()
+
+		iter, err := txn.Iter(startKey, endKey)
+		if err != nil {
+			fmt.Printf("迭代err: %v\n", err)
+			return
+		}
+		defer iter.Close()
+
+		processedInBatch = 0
+		for iter.Valid() && processedInBatch < batchSize {
+			select {
+			case <-sigCh:
+				fmt.Println("\n操作已取消")
+				return
+			default:
+				err = txn.Delete(iter.Key())
 				if err != nil {
-					fmt.Printf("事务提交失败: %v\n", err)
+					fmt.Printf("删除key=%s失败: %v\n", iter.Key(), err)
 				} else {
-					fmt.Println("已删除:1000,事务二次开启...")
-					txn, err = c.Client.Begin()
-					if err != nil {
-						fmt.Printf("事务二次开启失败: %v\n", err)
-						return
-					}
+					deletedTotal++
+					processedInBatch++
+				}
+				if err = iter.Next(); err != nil {
+					fmt.Printf("iter.Next err: %v\n", err)
+					break
 				}
 			}
 		}
-	}
-	// 提交剩余的事务
-	if deletedTotal%1000 != 0 {
-		err = txn.Commit(context.Background())
-		if err != nil {
-			fmt.Printf("最后一批事务提交失败: %v\n", err)
-			return
+
+		// 提交当前批次
+		if processedInBatch > 0 {
+			err = txn.Commit(context.Background())
+			if err != nil {
+				fmt.Printf("事务提交失败: %v\n", err)
+				return
+			}
+			fmt.Printf("已删除批次: %d, 总计已删除: %d\n", processedInBatch, deletedTotal)
+
+			if iter.Valid() {
+				startKey = append(iter.Key(), 0)
+			} else {
+				break
+			}
+		} else {
+			break
 		}
 	}
+
 	fmt.Println("已删除总计:", deletedTotal, "耗时:", time.Since(startTime))
 }

@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	//utils.DataAdd()
 
 	line := liner.NewLiner()
 	defer line.Close()
