@@ -81,15 +81,29 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 					c.handleListRange(cmd[1], cmd[2], "", limit)
 				} else if strings.Contains(cmd[3], "-json") {
 					c.handleListRange(cmd[1], cmd[2], cmd[3], -1)
+				} else {
+					fmt.Println("使用方法: ll <startKey> <endKey> -json -limit=n")
 				}
 			} else if len(cmd) == 5 {
-				split := strings.Split(cmd[4], "=")
-				limit, err := strconv.Atoi(split[1])
-				if err != nil {
-					fmt.Println("输入-limit参数有误")
-					return
+				if strings.Contains(cmd[3], "-json") && strings.Contains(cmd[4], "-limit") {
+					split := strings.Split(cmd[4], "=")
+					limit, err := strconv.Atoi(split[1])
+					if err != nil {
+						fmt.Println("输入-limit参数有误")
+						return
+					}
+					c.handleListRange(cmd[1], cmd[2], cmd[3], limit)
+				} else if strings.Contains(cmd[3], "-limit") && strings.Contains(cmd[4], "-json") {
+					split := strings.Split(cmd[3], "=")
+					limit, err := strconv.Atoi(split[1])
+					if err != nil {
+						fmt.Println("输入-limit参数有误")
+						return
+					}
+					c.handleListRange(cmd[1], cmd[2], cmd[4], limit)
+				} else {
+					fmt.Println("使用方法: ll <startKey> <endKey> -json -limit=n")
 				}
-				c.handleListRange(cmd[1], cmd[2], cmd[3], limit)
 			} else {
 				fmt.Println("使用方法: ll <startKey> <endKey> -json -limit=n")
 			}
