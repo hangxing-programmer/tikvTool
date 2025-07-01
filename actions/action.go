@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/peterh/liner"
 	"github.com/tikv/client-go/v2/txnkv"
@@ -23,7 +24,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 	for {
 		input, err := line.Prompt("TiKVClient> ")
 		if err != nil {
-			if err == liner.ErrPromptAborted {
+			if errors.Is(err, liner.ErrPromptAborted) {
 				return
 			}
 			fmt.Println("读取输入失败:", err)
@@ -64,31 +65,31 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 					c.handleListRange(cmd[1], "", cmd[2], limit)
 				} else if strings.Contains(cmd[2], "-limit") && strings.Contains(cmd[3], "-json") {
 					split := strings.Split(cmd[2], "=")
-					atoi, err := strconv.Atoi(split[1])
+					limit, err := strconv.Atoi(split[1])
 					if err != nil {
 						fmt.Println("输入-limit参数有误")
 						return
 					}
-					c.handleListRange(cmd[1], "", cmd[3], atoi)
+					c.handleListRange(cmd[1], "", cmd[3], limit)
 				} else if strings.Contains(cmd[3], "-limit") {
 					split := strings.Split(cmd[3], "=")
-					atoi, err := strconv.Atoi(split[1])
+					limit, err := strconv.Atoi(split[1])
 					if err != nil {
 						fmt.Println("输入-limit参数有误")
 						return
 					}
-					c.handleListRange(cmd[1], cmd[2], "", atoi)
+					c.handleListRange(cmd[1], cmd[2], "", limit)
 				} else if strings.Contains(cmd[3], "-json") {
 					c.handleListRange(cmd[1], cmd[2], cmd[3], -1)
 				}
 			} else if len(cmd) == 5 {
 				split := strings.Split(cmd[4], "=")
-				atoi, err := strconv.Atoi(split[1])
+				limit, err := strconv.Atoi(split[1])
 				if err != nil {
 					fmt.Println("输入-limit参数有误")
 					return
 				}
-				c.handleListRange(cmd[1], cmd[2], cmd[3], atoi)
+				c.handleListRange(cmd[1], cmd[2], cmd[3], limit)
 			} else {
 				fmt.Println("使用方法: ll <startKey> <endKey> -json -limit=n")
 			}
@@ -208,15 +209,16 @@ func (c *TiKVClient) handleListRange(key1, key2, json string, limit int) {
 
 	// 如果key2为空，则计算key1的下一个键
 	if key2 == "" {
-		key2Bytes := []byte(key1)
-		for i := len(key2Bytes) - 1; i >= 0; i-- {
-			if key2Bytes[i] < 255 {
-				key2Bytes[i]++
-				break
-			}
-			key2Bytes[i] = 0
-		}
-		key2 = string(key2Bytes)
+		key2 = key1[0:strings.LastIndex(key1, "/")] + "0"
+		//key2Bytes := []byte(key1)
+		//for i := len(key2Bytes) - 1; i >= 0; i-- {
+		//	if key2Bytes[i] < 255 {
+		//		key2Bytes[i]++
+		//		break
+		//	}
+		//	key2Bytes[i] = 0
+		//}
+		//key2 = string(key2Bytes)
 	}
 
 	// 创建中断信号通道
