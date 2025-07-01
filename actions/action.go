@@ -322,7 +322,7 @@ func (c *TiKVClient) findLike(key string, json bool) {
 	defer signal.Stop(sigCh)
 
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
-		iter, err := txn.Iter([]byte(key), nil)
+		iter, err := txn.Iter([]byte(key), []byte(key+"0"))
 		if err != nil {
 			fmt.Printf("创建迭代器失败: %v\n", err)
 			return err
