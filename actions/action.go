@@ -78,7 +78,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 						fmt.Println("输入-limit参数有误")
 						continue
 					}
-					c.handleListRange(cmd[1], cmd[2], true, limit)
+					c.handleListRange(cmd[1], cmd[2], false, limit)
 				} else {
 					fmt.Println("使用方法: ll <prefixKey> [endKey] -limit=n -pv")
 				}
@@ -207,7 +207,7 @@ func (c *TiKVClient) handleListAll(start string, pv bool) {
 	defer signal.Stop(sigCh)
 
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
-		iter, err := txn.Iter([]byte(start), []byte(start+"\xFF"))
+		iter, err := txn.Iter([]byte(start), []byte(utils.IncrementLastCharASCII(start)))
 		if err != nil {
 			fmt.Printf("创建迭代器失败: %v\n", err)
 			return nil
@@ -256,9 +256,9 @@ func (c *TiKVClient) handleListRange(key1, key2 string, pv bool, limit int) {
 		if !strings.Contains(key1, "/") {
 			key1 = key1 + "/"
 		}
-		key2 = key1[0:strings.LastIndex(key1, "/")] + "\xFF"
+		key2 = utils.IncrementLastCharASCII(key1)
 	} else {
-		key2 = key2 + "\xFF"
+		key2 = utils.IncrementLastCharASCII(key2)
 	}
 
 	// 创建中断信号通道
@@ -341,9 +341,9 @@ func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
 	defer signal.Stop(sigCh)
 
 	if key2 == "" {
-		key2 = key1 + "\xFF"
+		key2 = utils.IncrementLastCharASCII(key1)
 	} else {
-		key2 = key2 + "\xFF"
+		key2 = utils.IncrementLastCharASCII(key2)
 	}
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
 		iter, err := txn.Iter([]byte(key1), []byte(key2))
@@ -411,7 +411,7 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 	batchSize := 3000
 	processedInBatch := 0
 	startKey := []byte(start)
-	endKey := []byte(end + "\xFF")
+	endKey := []byte(utils.IncrementLastCharASCII(end))
 
 	for {
 		txn, err := c.Client.Begin()
@@ -502,7 +502,7 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 		}
 		defer txn.Rollback()
 
-		iter, err := txn.Iter([]byte(startKey), []byte(startKey+"\xFF"))
+		iter, err := txn.Iter([]byte(startKey), []byte(utils.IncrementLastCharASCII(startKey)))
 		if err != nil {
 			fmt.Printf("迭代err: %v\n", err)
 			return
@@ -566,9 +566,9 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 	defer signal.Stop(sigCh)
 
 	if key2 == "" {
-		key2 = key1 + "\xFF"
+		key2 = utils.IncrementLastCharASCII(key1)
 	} else {
-		key2 = key2 + "\xFF"
+		key2 = utils.IncrementLastCharASCII(key2)
 	}
 
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
