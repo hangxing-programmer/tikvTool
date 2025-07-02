@@ -2,11 +2,13 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/peterh/liner"
 	"github.com/tikv/client-go/v2/txnkv"
 	"github.com/tikv/client-go/v2/txnkv/transaction"
+	"log"
 	"os"
 	"os/signal"
 	"strconv"
@@ -18,6 +20,11 @@ import (
 
 type TiKVClient struct {
 	Client *txnkv.Client
+}
+type Data struct {
+	Owner       string `json:"owner"`
+	LockTime    int64  `json:"lockTime"`
+	MaxDuration int64  `json:"maxDuration"`
 }
 
 func (c *TiKVClient) StartCmd(line *liner.State) {
@@ -50,6 +57,8 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			} else if len(cmd) == 3 { // 提供前缀,有value
 				if cmd[2] == "-pv" {
 					c.handleListAll(cmd[1], true)
+				} else if len(cmd) == 3 && strings.Contains(cmd[2], "-limit=") {
+					c.handleListRange(cmd[1], "", false, utils.Str2int(cmd[2], "-limit="))
 				} else {
 					c.handleListRange(cmd[1], cmd[2], false, -1)
 				}
@@ -114,8 +123,12 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				}
 			} else if len(cmd) == 3 {
 				c.handleDelRange(cmd[1], cmd[2])
+			} else if len(cmd) == 5 {
+				lockTime, _ := strconv.Atoi(cmd[4])
+				maxDuration, _ := strconv.Atoi(cmd[3])
+				c.handleDeleteLock(cmd[1], cmd[2], int64(maxDuration), int64(lockTime))
 			} else {
-				fmt.Println("使用方法: del <key>; del <startKey> <endKey>")
+				fmt.Println("使用方法: del <key>; del <startKey> <endKey>; del <lockKey> owner maxDuration lockTime")
 			}
 
 		case "find":
@@ -127,7 +140,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			} else if len(cmd) == 4 && strings.Contains(cmd[3], "-limit") {
 				c.findLike(cmd[1], "", strings.Split(cmd[2], "-value=")[1], false, utils.Str2int(cmd[3], "-limit="))
 			} else if len(cmd) == 5 && strings.Contains(cmd[3], "-limit") && strings.Contains(cmd[4], "-pv") {
-				c.findLike(cmd[1], "", strings.Split(cmd[2], "-value=")[1], false, utils.Str2int(cmd[3], "-limit="))
+				c.findLike(cmd[1], "", strings.Split(cmd[2], "-value=")[1], true, utils.Str2int(cmd[3], "-limit="))
 			} else if len(cmd) == 5 && !strings.Contains(cmd[3], "-pv") {
 				c.findLike(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1], false, utils.Str2int(cmd[4], "-limit="))
 			} else {
@@ -136,15 +149,17 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 		case "exit":
 			return
 		case "count":
-			if len(cmd) < 3 {
-				fmt.Println("使用方法: count <prefixKey> [endKey] -value=xxx")
+			if len(cmd) < 2 {
+				fmt.Println("使用方法: count <prefixKey> [endKey]")
 				continue
 			} else if len(cmd) == 3 && strings.Contains(cmd[2], "-value=") {
 				c.handleCount(cmd[1], "", strings.Split(cmd[2], "-value=")[1])
 			} else if len(cmd) == 4 && strings.Contains(cmd[3], "-value=") {
 				c.handleCount(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1])
+			} else if len(cmd) == 2 {
+				c.handleCount(cmd[1], "", "")
 			} else {
-				fmt.Println("使用方法: count <prefixKey> [endKey] -value=xxx -limit=n")
+				fmt.Println("使用方法: count <prefixKey> [endKey]")
 			}
 		default:
 			fmt.Println("可用命令: get, ll, exit, set, del, find, count")
@@ -192,7 +207,7 @@ func (c *TiKVClient) handleListAll(start string, pv bool) {
 	defer signal.Stop(sigCh)
 
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
-		iter, err := txn.Iter([]byte(start), nil)
+		iter, err := txn.Iter([]byte(start), []byte(start+"0"))
 		if err != nil {
 			fmt.Printf("创建迭代器失败: %v\n", err)
 			return nil
@@ -470,6 +485,86 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 	fmt.Println("已删除总计:", deletedTotal, "耗时:", time.Since(startTime))
 }
 
+func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime int64) {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	deletedTotal := 0
+	startTime := time.Now()
+
+	startKey := key + "/Data/Lock"
+
+	for {
+		txn, err := c.Client.Begin()
+		if err != nil {
+			fmt.Printf("事务开启失败: %v\n", err)
+			return
+		}
+		defer txn.Rollback()
+
+		iter, err := txn.Iter([]byte(startKey), []byte(startKey+"0"))
+		if err != nil {
+			fmt.Printf("迭代err: %v\n", err)
+			return
+		}
+		defer iter.Close()
+
+		batchSize := 1000
+		processedInBatch := 0
+		for iter.Valid() && processedInBatch < batchSize {
+			select {
+			case <-sigCh:
+				fmt.Println("\n操作已取消")
+				return
+			default:
+				var result []byte
+				err = c.executeTxn(func(txn *transaction.KVTxn) error {
+					val, err := txn.Get(context.Background(), iter.Key())
+					result = val
+					return err
+				})
+				var data Data
+				err = json.Unmarshal(result, &data)
+				if err != nil {
+					log.Fatalf("JSON 解析失败: %v", err)
+				}
+
+				if strings.Compare(data.Owner, owner) == 0 && data.MaxDuration == maxDuration && data.LockTime > lockTime {
+					err = txn.Delete(iter.Key())
+					if err != nil {
+						fmt.Printf("删除key=%s失败: %v\n", iter.Key(), err)
+					} else {
+						deletedTotal++
+						processedInBatch++
+					}
+				}
+				if err = iter.Next(); err != nil {
+					fmt.Printf("iter.Next err: %v\n", err)
+					break
+				}
+			}
+		}
+
+		// 提交当前批次
+		if processedInBatch > 0 {
+			err = txn.Commit(context.Background())
+			if err != nil {
+				fmt.Printf("事务提交失败: %v\n", err)
+				return
+			}
+			fmt.Printf("已删除批次: %d, 总计已删除: %d\n", processedInBatch, deletedTotal)
+			//if iter.Valid() {
+			//	startKey = string(append(iter.Key(), 0))
+			//} else {
+			//	break
+			//}
+		} else {
+			break
+		}
+	}
+	fmt.Println("已删除总计:", deletedTotal, "耗时:", time.Since(startTime))
+}
+
 func (c *TiKVClient) handleCount(key1, key2, value string) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -497,7 +592,9 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 				return nil
 			default:
 				key := iter.Key()
-				if strings.Contains(string(key), value) {
+				if value != "" && strings.Contains(string(key), value) {
+					count++
+				} else if value == "" {
 					count++
 				}
 
