@@ -1,8 +1,12 @@
 package utils
 
 import (
+	"fmt"
+	"log"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func Str2int(str1, str2 string) int {
@@ -29,4 +33,28 @@ func IncrementLastCharASCII(s string) string {
 		b[len(b)-1]++
 	}
 	return string(b)
+}
+
+func InitLog() (*log.Logger, *os.File, error) {
+	now := time.Now()
+
+	logFileName := fmt.Sprintf("tikvcli-%04d%02d%02d.log",
+		now.Year(), now.Month(), now.Day())
+
+	var logFile *os.File
+	var err error
+
+	// 检查日志文件是否存在
+	if _, err := os.Stat(logFileName); err == nil {
+		// 文件存在，以读写和追加模式打开文件
+		logFile, err = os.OpenFile(logFileName, os.O_RDWR|os.O_APPEND, 0644)
+	} else if os.IsNotExist(err) {
+		// 文件不存在，创建文件
+		logFile, err = os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	}
+	if err != nil {
+		return nil, logFile, fmt.Errorf("open log file err: %v", err)
+	}
+
+	return log.New(logFile, "", log.LstdFlags), logFile, nil
 }

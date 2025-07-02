@@ -6,12 +6,20 @@ import (
 	"github.com/pingcap/log"
 	"github.com/tikv/client-go/v2/txnkv"
 	"go.uber.org/zap"
+	"os"
 	"strings"
 	"tikv/actions"
+	"tikv/base"
+	"tikv/utils"
 )
 
 func main() {
 	//utils.DataAdd()
+
+	var logFile *os.File
+
+	base.GlobalLogger, logFile, _ = utils.InitLog()
+	defer logFile.Close()
 
 	line := liner.NewLiner()
 	defer line.Close()
@@ -40,21 +48,4 @@ func main() {
 	// 初始化命令行界面
 	cli := &actions.TiKVClient{client}
 	cli.StartCmd(line)
-
-	//Current StartTS: 458995024769843200
-	//Current StartTS: 458995024527360000
-	//Current StartTS: 459002574274560000
-	//Parsed Time: 2025-06-26-16:37:45
-	//fmt.Println(utils.TikvTimeFormat(458995024769843200))
-	//fmt.Println(utils.TimeToTS("2025-06-26 16:37:45"))
-
-	//now := time.Now()
-	//physical := uint64(now.UnixMilli()) // 当前时间的毫秒级时间戳
-	//startTS := physical << 18           // 左移 18 位（逻辑计数默认为 0）
-	//fmt.Printf("Current StartTS: %d\n", startTS)
-	//
-	//// 反向解析验证
-	//physical = startTS >> 18
-	//t := time.UnixMilli(int64(physical))
-	//fmt.Printf("Parsed Time: %s\n", t.Format("2006-01-02 15:04:05"))
 }

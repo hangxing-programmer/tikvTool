@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"tikv/base"
 	"tikv/utils"
 	"time"
 )
@@ -108,7 +109,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				fmt.Println("使用方法: del <key>; del <startKey> <endKey>")
 				continue
 			} else if len(cmd) == 2 {
-				fmt.Printf("是否确认删除 key=%s? (yes/no): ", cmd[1])
+				fmt.Printf("是否确认删除 key=%s? (yes/no): \n", cmd[1])
 				var confirm string
 				_, err := fmt.Scan(&confirm)
 				if err != nil {
@@ -118,7 +119,6 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				if confirm != "yes" {
 					continue
 				} else {
-					fmt.Println("键已删除")
 					c.handleDelete(cmd[1])
 				}
 			} else if len(cmd) == 3 {
@@ -325,13 +325,25 @@ func (c *TiKVClient) HandleSet(key, value string) {
 }
 
 func (c *TiKVClient) handleDelete(key string) {
+	var result []byte
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
+		val, err := txn.Get(context.Background(), []byte(key))
+		result = val
+		return err
+	})
+	if err != nil {
+		fmt.Println("键值不存在")
+		return
+	}
+	err = c.executeTxn(func(txn *transaction.KVTxn) error {
 		return txn.Delete([]byte(key))
 	})
 	if err != nil {
 		fmt.Printf("删除失败: %v\n", err)
 		return
 	}
+	fmt.Println("键已删除")
+	base.GlobalLogger.Printf("key: %s, value: %s", key, string(result))
 }
 
 func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
@@ -435,7 +447,7 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 				fmt.Println("\n操作已取消")
 				return
 			default:
-				fmt.Printf("是否确认删除 key=%s? (yes/no): ", iter.Key())
+				fmt.Printf("是否确认删除 key=%s? (yes/no): \n", iter.Key())
 				var confirm string
 				_, err := fmt.Scan(&confirm)
 				if err != nil {
@@ -455,6 +467,8 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 				} else {
 					deletedTotal++
 					processedInBatch++
+					fmt.Println("键已删除")
+					base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
 				}
 				if err = iter.Next(); err != nil {
 					fmt.Printf("iter.Next err: %v\n", err)
@@ -536,6 +550,7 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 					} else {
 						deletedTotal++
 						processedInBatch++
+						base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
 					}
 				}
 				if err = iter.Next(); err != nil {
