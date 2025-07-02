@@ -1,5 +1,11 @@
 package base
 
-import "log"
+import (
+	"log"
+	"os"
+)
 
-var GlobalLogger *log.Logger
+var (
+	GlobalLogger  *log.Logger
+	GLobalLogFile *os.File
+)

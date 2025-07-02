@@ -161,6 +161,15 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			} else {
 				fmt.Println("使用方法: count <prefixKey> [endKey]")
 			}
+		case "version":
+			c.handleVersion()
+		case "delFromTo":
+			if len(cmd) == 1 {
+				c.handleLog(true)
+			} else if len(cmd) == 2 && strings.Contains(cmd[1], "-nolog") {
+				c.handleLog(false)
+			}
+
 		default:
 			fmt.Println("可用命令: get, ll, exit, set, del, find, count")
 		}
@@ -343,7 +352,9 @@ func (c *TiKVClient) handleDelete(key string) {
 		return
 	}
 	fmt.Println("键已删除")
-	base.GlobalLogger.Printf("key: %s, value: %s", key, string(result))
+	if base.GlobalLogger != nil {
+		base.GlobalLogger.Printf("key: %s, value: %s", key, string(result))
+	}
 }
 
 func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
@@ -468,7 +479,9 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 					deletedTotal++
 					processedInBatch++
 					fmt.Println("键已删除")
-					base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
+					if base.GlobalLogger != nil {
+						base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
+					}
 				}
 				if err = iter.Next(); err != nil {
 					fmt.Printf("iter.Next err: %v\n", err)
@@ -550,7 +563,9 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 					} else {
 						deletedTotal++
 						processedInBatch++
-						base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
+						if base.GlobalLogger != nil {
+							base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
+						}
 					}
 				}
 				if err = iter.Next(); err != nil {
@@ -620,6 +635,19 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 	if err != nil {
 		fmt.Printf("操作失败: %v\n", err)
 		return
+	}
+
+}
+
+func (c *TiKVClient) handleVersion() string {
+	return ""
+}
+
+func (c *TiKVClient) handleLog(nolog bool) {
+	if nolog {
+		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+	} else {
+		base.GLobalLogFile.Close()
 	}
 
 }

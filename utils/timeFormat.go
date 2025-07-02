@@ -63,7 +63,7 @@ func DataAdd() {
 		return
 	}
 	str := "OS/T03/Data/Lock/"
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 10; i++ {
 		ts := baseTime.Add(time.Duration(i) * time.Second)
 		tsString := ts.Format("2006-01-02 15:04:05")
 		_ = txn.Set([]byte(str+strconv.FormatInt(int64(TimeToTS(tsString)), 10)+"1000000"), []byte("{\"owner\":\"C003\",\"lockTime\":1747729163004,\"objectKey\":\"prefix/303.png\",\"objectVersionID\":\"6688368-00c52745-4748-4970-a8d0-2329cba075fc\",\"maxDuration\":259200000}"))
