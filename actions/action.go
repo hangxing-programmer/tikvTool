@@ -207,7 +207,7 @@ func (c *TiKVClient) handleListAll(start string, pv bool) {
 	defer signal.Stop(sigCh)
 
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
-		iter, err := txn.Iter([]byte(start), []byte(start+"0"))
+		iter, err := txn.Iter([]byte(start), []byte(start+"\xFF"))
 		if err != nil {
 			fmt.Printf("创建迭代器失败: %v\n", err)
 			return nil
@@ -256,9 +256,9 @@ func (c *TiKVClient) handleListRange(key1, key2 string, pv bool, limit int) {
 		if !strings.Contains(key1, "/") {
 			key1 = key1 + "/"
 		}
-		key2 = key1[0:strings.LastIndex(key1, "/")] + "0"
+		key2 = key1[0:strings.LastIndex(key1, "/")] + "\xFF"
 	} else {
-		key2 = key2 + "0"
+		key2 = key2 + "\xFF"
 	}
 
 	// 创建中断信号通道
@@ -341,9 +341,9 @@ func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
 	defer signal.Stop(sigCh)
 
 	if key2 == "" {
-		key2 = key1 + "0"
+		key2 = key1 + "\xFF"
 	} else {
-		key2 = key2 + "0"
+		key2 = key2 + "\xFF"
 	}
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
 		iter, err := txn.Iter([]byte(key1), []byte(key2))
@@ -411,7 +411,7 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 	batchSize := 3000
 	processedInBatch := 0
 	startKey := []byte(start)
-	endKey := []byte(end + "0")
+	endKey := []byte(end + "\xFF")
 
 	for {
 		txn, err := c.Client.Begin()
@@ -502,7 +502,7 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 		}
 		defer txn.Rollback()
 
-		iter, err := txn.Iter([]byte(startKey), []byte(startKey+"0"))
+		iter, err := txn.Iter([]byte(startKey), []byte(startKey+"\xFF"))
 		if err != nil {
 			fmt.Printf("迭代err: %v\n", err)
 			return
@@ -553,11 +553,6 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 				return
 			}
 			fmt.Printf("已删除批次: %d, 总计已删除: %d\n", processedInBatch, deletedTotal)
-			//if iter.Valid() {
-			//	startKey = string(append(iter.Key(), 0))
-			//} else {
-			//	break
-			//}
 		} else {
 			break
 		}
@@ -571,9 +566,9 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 	defer signal.Stop(sigCh)
 
 	if key2 == "" {
-		key2 = key1 + "0"
+		key2 = key1 + "\xFF"
 	} else {
-		key2 = key2 + "0"
+		key2 = key2 + "\xFF"
 	}
 
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
