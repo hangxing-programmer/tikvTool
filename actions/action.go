@@ -45,67 +45,48 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			}
 			c.handleGet(cmd[1])
 		case "ll":
-			if len(cmd) == 3 { // 提供前缀,有value
-				if cmd[2] == "-json" {
-					c.handleListAll(cmd[1], cmd[2])
-				} else if strings.Contains(cmd[2], "-limit") {
-					limit, _ := strconv.Atoi(strings.Split(cmd[2], "=")[1])
-					c.handleListRange(cmd[1], "", "", limit)
+			if len(cmd) == 2 {
+				c.handleListAll(cmd[1], false)
+			} else if len(cmd) == 3 { // 提供前缀,有value
+				if cmd[2] == "-pv" {
+					c.handleListAll(cmd[1], true)
 				} else {
-					c.handleListRange(cmd[1], cmd[2], "", -1)
+					c.handleListRange(cmd[1], cmd[2], false, -1)
 				}
 			} else if len(cmd) == 4 { // 有参数时范围读取,有value
-				if strings.Contains(cmd[3], "-limit") && strings.Contains(cmd[2], "-json") {
-					split := strings.Split(cmd[3], "=")
-					limit, err := strconv.Atoi(split[1])
-					if err != nil {
-						fmt.Println("输入-limit参数有误")
-						return
-					}
-					c.handleListRange(cmd[1], "", cmd[2], limit)
-				} else if strings.Contains(cmd[2], "-limit") && strings.Contains(cmd[3], "-json") {
+				if strings.Contains(cmd[2], "-limit") && strings.Contains(cmd[3], "-pv") {
 					split := strings.Split(cmd[2], "=")
 					limit, err := strconv.Atoi(split[1])
 					if err != nil {
 						fmt.Println("输入-limit参数有误")
-						return
+						continue
 					}
-					c.handleListRange(cmd[1], "", cmd[3], limit)
-				} else if strings.Contains(cmd[3], "-limit") {
+					c.handleListRange(cmd[1], "", true, limit)
+				} else if strings.Contains(cmd[3], "-limit") && !strings.Contains(cmd[3], "-pv") {
 					split := strings.Split(cmd[3], "=")
 					limit, err := strconv.Atoi(split[1])
 					if err != nil {
 						fmt.Println("输入-limit参数有误")
-						return
+						continue
 					}
-					c.handleListRange(cmd[1], cmd[2], "", limit)
-				} else if strings.Contains(cmd[3], "-json") {
-					c.handleListRange(cmd[1], cmd[2], cmd[3], -1)
+					c.handleListRange(cmd[1], cmd[2], true, limit)
 				} else {
-					fmt.Println("使用方法: ll <startKey> <endKey> -json -limit=n")
+					fmt.Println("使用方法: ll <prefixKey> [endKey] -limit=n -pv")
 				}
 			} else if len(cmd) == 5 {
-				if strings.Contains(cmd[3], "-json") && strings.Contains(cmd[4], "-limit") {
-					split := strings.Split(cmd[4], "=")
-					limit, err := strconv.Atoi(split[1])
-					if err != nil {
-						fmt.Println("输入-limit参数有误")
-						return
-					}
-					c.handleListRange(cmd[1], cmd[2], cmd[3], limit)
-				} else if strings.Contains(cmd[3], "-limit") && strings.Contains(cmd[4], "-json") {
+				if strings.Contains(cmd[4], "-pv") && strings.Contains(cmd[3], "-limit") {
 					split := strings.Split(cmd[3], "=")
 					limit, err := strconv.Atoi(split[1])
 					if err != nil {
 						fmt.Println("输入-limit参数有误")
-						return
+						continue
 					}
-					c.handleListRange(cmd[1], cmd[2], cmd[4], limit)
+					c.handleListRange(cmd[1], cmd[2], true, limit)
 				} else {
-					fmt.Println("使用方法: ll <startKey> <endKey> -json -limit=n")
+					fmt.Println("使用方法: ll <prefixKey> [endKey] -limit=n -pv")
 				}
 			} else {
-				fmt.Println("使用方法: ll <startKey> <endKey> -json -limit=n")
+				fmt.Println("使用方法: ll <prefixKey> [endKey] -limit=n -pv")
 			}
 		case "set":
 			if len(cmd) < 3 {
@@ -115,27 +96,58 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			c.HandleSet(cmd[1], strings.Join(cmd[2:], " "))
 		case "del":
 			if len(cmd) < 2 {
-				fmt.Println("使用方法: del <key>")
+				fmt.Println("使用方法: del <key>; del <startKey> <endKey>")
 				continue
 			} else if len(cmd) == 2 {
-				c.handleDelete(cmd[1])
+				fmt.Printf("是否确认删除 key=%s? (yes/no): ", cmd[1])
+				var confirm string
+				_, err := fmt.Scan(&confirm)
+				if err != nil {
+					fmt.Printf("读取用户输入失败: %v\n", err)
+					continue
+				}
+				if confirm != "yes" {
+					continue
+				} else {
+					fmt.Println("键已删除")
+					c.handleDelete(cmd[1])
+				}
 			} else if len(cmd) == 3 {
 				c.handleDelRange(cmd[1], cmd[2])
+			} else {
+				fmt.Println("使用方法: del <key>; del <startKey> <endKey>")
 			}
 
 		case "find":
-			if len(cmd) < 2 {
-				fmt.Println("使用方法: find <key> -json")
+			if len(cmd) < 4 {
+				fmt.Println("使用方法: find <prefixKey> [endKey] -value=xxx -limit=n -pv")
 				continue
-			} else if len(cmd) == 2 {
-				c.findLike(cmd[1], false)
-			} else if strings.Contains(cmd[2], "-json") {
-				c.findLike(cmd[1], true)
+			} else if len(cmd) == 6 && strings.Contains(cmd[5], "pv") {
+				c.findLike(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1], true, utils.Str2int(cmd[4], "-limit="))
+			} else if len(cmd) == 4 && strings.Contains(cmd[3], "-limit") {
+				c.findLike(cmd[1], "", strings.Split(cmd[2], "-value=")[1], false, utils.Str2int(cmd[3], "-limit="))
+			} else if len(cmd) == 5 && strings.Contains(cmd[3], "-limit") && strings.Contains(cmd[4], "-pv") {
+				c.findLike(cmd[1], "", strings.Split(cmd[2], "-value=")[1], false, utils.Str2int(cmd[3], "-limit="))
+			} else if len(cmd) == 5 && !strings.Contains(cmd[3], "-pv") {
+				c.findLike(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1], false, utils.Str2int(cmd[4], "-limit="))
+			} else {
+				fmt.Println("使用方法: find <prefixKey> [endKey] -value=xxx -limit=n -pv")
 			}
 		case "exit":
 			return
+		case "count":
+			if len(cmd) < 3 {
+				fmt.Println("使用方法: count <prefixKey> [endKey] -value=xxx")
+				continue
+			} else if len(cmd) == 3 && strings.Contains(cmd[2], "-value=") {
+				c.handleCount(cmd[1], "", strings.Split(cmd[2], "-value=")[1])
+			} else if len(cmd) == 4 && strings.Contains(cmd[3], "-value=") {
+				c.handleCount(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1])
+			} else {
+				fmt.Println("使用方法: count <prefixKey> [endKey] -value=xxx -limit=n")
+			}
 		default:
-			fmt.Println("可用命令: get, ll, exit, set, del, find,")
+			fmt.Println("可用命令: get, ll, exit, set, del, find, count")
 		}
 	}
 }
@@ -172,7 +184,7 @@ func (c *TiKVClient) handleGet(key string) {
 	fmt.Printf("value = %s\n", string(result))
 }
 
-func (c *TiKVClient) handleListAll(start, json string) {
+func (c *TiKVClient) handleListAll(start string, pv bool) {
 
 	// 创建中断信号通道
 	sigCh := make(chan os.Signal, 1)
@@ -198,7 +210,7 @@ func (c *TiKVClient) handleListAll(start, json string) {
 				value := iter.Value()
 
 				// 格式化显示
-				if json == "-json" {
+				if pv {
 					fmt.Printf("%s", string(key))
 					fmt.Printf("	Value = %s\n", string(value))
 				} else {
@@ -222,7 +234,7 @@ func (c *TiKVClient) handleListAll(start, json string) {
 	}
 }
 
-func (c *TiKVClient) handleListRange(key1, key2, json string, limit int) {
+func (c *TiKVClient) handleListRange(key1, key2 string, pv bool, limit int) {
 
 	// 如果key2为空，则计算key1的下一个键
 	if key2 == "" {
@@ -230,15 +242,8 @@ func (c *TiKVClient) handleListRange(key1, key2, json string, limit int) {
 			key1 = key1 + "/"
 		}
 		key2 = key1[0:strings.LastIndex(key1, "/")] + "0"
-		//key2Bytes := []byte(key1)
-		//for i := len(key2Bytes) - 1; i >= 0; i-- {
-		//	if key2Bytes[i] < 255 {
-		//		key2Bytes[i]++
-		//		break
-		//	}
-		//	key2Bytes[i] = 0
-		//}
-		//key2 = string(key2Bytes)
+	} else {
+		key2 = key2 + "0"
 	}
 
 	// 创建中断信号通道
@@ -269,7 +274,7 @@ func (c *TiKVClient) handleListRange(key1, key2, json string, limit int) {
 				value := iter.Value()
 
 				// 格式化显示
-				if json == "-json" {
+				if pv {
 					fmt.Printf("%s", string(key))
 					fmt.Printf("	Value = %s\n", string(value))
 				} else {
@@ -312,17 +317,21 @@ func (c *TiKVClient) handleDelete(key string) {
 		fmt.Printf("删除失败: %v\n", err)
 		return
 	}
-	fmt.Println("键已删除")
 }
 
-func (c *TiKVClient) findLike(key string, json bool) {
+func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
 	// 创建中断信号通道
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
 
+	if key2 == "" {
+		key2 = key1 + "0"
+	} else {
+		key2 = key2 + "0"
+	}
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
-		iter, err := txn.Iter([]byte(key), []byte(key+"0"))
+		iter, err := txn.Iter([]byte(key1), []byte(key2))
 		if err != nil {
 			fmt.Printf("创建迭代器失败: %v\n", err)
 			return err
@@ -331,6 +340,9 @@ func (c *TiKVClient) findLike(key string, json bool) {
 
 		var count int
 		for iter.Valid() {
+			if count >= limit && limit > 0 {
+				break
+			}
 			select {
 			case <-sigCh:
 				fmt.Println("\n操作已取消")
@@ -338,12 +350,12 @@ func (c *TiKVClient) findLike(key string, json bool) {
 			default:
 				k := iter.Key()
 				v := iter.Value()
-				if json && strings.Contains(string(k), key) {
+				if pv && strings.Contains(string(k), value) {
 					fmt.Printf("%s", string(k))
 					fmt.Printf("  Value = %s\n", string(v))
 					count++
 				} else {
-					if strings.Contains(string(k), key) {
+					if strings.Contains(string(k), value) {
 						fmt.Printf("%s\n", string(k))
 						count++
 					}
@@ -384,7 +396,7 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 	batchSize := 3000
 	processedInBatch := 0
 	startKey := []byte(start)
-	endKey := []byte(end)
+	endKey := []byte(end + "0")
 
 	for {
 		txn, err := c.Client.Begin()
@@ -408,6 +420,20 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 				fmt.Println("\n操作已取消")
 				return
 			default:
+				fmt.Printf("是否确认删除 key=%s? (yes/no): ", iter.Key())
+				var confirm string
+				_, err := fmt.Scan(&confirm)
+				if err != nil {
+					fmt.Printf("读取用户输入失败: %v\n", err)
+					continue
+				}
+				if confirm != "yes" {
+					if err = iter.Next(); err != nil {
+						fmt.Printf("iter.Next err: %v\n", err)
+						break
+					}
+					continue
+				}
 				err = txn.Delete(iter.Key())
 				if err != nil {
 					fmt.Printf("删除key=%s失败: %v\n", iter.Key(), err)
@@ -442,4 +468,51 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 	}
 
 	fmt.Println("已删除总计:", deletedTotal, "耗时:", time.Since(startTime))
+}
+
+func (c *TiKVClient) handleCount(key1, key2, value string) {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+
+	if key2 == "" {
+		key2 = key1 + "0"
+	} else {
+		key2 = key2 + "0"
+	}
+
+	err := c.executeTxn(func(txn *transaction.KVTxn) error {
+		iter, err := txn.Iter([]byte(key1), []byte(key2))
+		if err != nil {
+			fmt.Printf("创建迭代器失败: %v\n", err)
+			return nil
+		}
+		defer iter.Close()
+
+		var count int
+		for iter.Valid() {
+			select {
+			case <-sigCh:
+				fmt.Println("\n操作已取消")
+				return nil
+			default:
+				key := iter.Key()
+				if strings.Contains(string(key), value) {
+					count++
+				}
+
+			}
+			if err := iter.Next(); err != nil {
+				fmt.Printf("迭代失败: %v\n", err)
+				break
+			}
+		}
+		fmt.Println(count)
+		return nil
+	})
+	if err != nil {
+		fmt.Printf("操作失败: %v\n", err)
+		return
+	}
+
 }

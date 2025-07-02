@@ -63,7 +63,7 @@ func DataAdd() {
 		return
 	}
 	str := "OS/T03/test/"
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 10; i++ {
 		ts := baseTime.Add(time.Duration(i) * time.Second)
 		tsString := ts.Format("2006-01-02 15:04:05")
 		_ = txn.Set([]byte(str+strconv.FormatInt(int64(TimeToTS(tsString)), 10)+"1000000"), []byte("test"))
