@@ -48,7 +48,7 @@ func TimeToTS(physical string) uint64 {
 	// CST 时间字符串 → 物理时间（毫秒）→ StartTS
 	startTime, err := time.ParseInLocation("2006-01-02 15:04:05", physical, cst)
 	if err != nil {
-		fmt.Println("解析失败:", err)
+		fmt.Println("analysis failed:", err)
 		return 0
 	}
 	return uint64(startTime.UnixMilli()) << 18

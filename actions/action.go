@@ -35,7 +35,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			if errors.Is(err, liner.ErrPromptAborted) {
 				return
 			}
-			fmt.Println("读取输入失败:", err)
+			fmt.Println("input err:", err)
 			continue
 		}
 
@@ -48,7 +48,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 		switch cmd[0] {
 		case "get":
 			if len(cmd) < 2 {
-				fmt.Println("使用方法: get <key>")
+				fmt.Println("usage: get <key>")
 				continue
 			}
 			c.handleGet(cmd[1])
@@ -68,7 +68,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 					split := strings.Split(cmd[2], "=")
 					limit, err := strconv.Atoi(split[1])
 					if err != nil {
-						fmt.Println("输入-limit参数有误")
+						fmt.Println("input -limit err")
 						continue
 					}
 					c.handleListRange(cmd[1], "", true, limit)
@@ -76,44 +76,44 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 					split := strings.Split(cmd[3], "=")
 					limit, err := strconv.Atoi(split[1])
 					if err != nil {
-						fmt.Println("输入-limit参数有误")
+						fmt.Println("input -limit err")
 						continue
 					}
 					c.handleListRange(cmd[1], cmd[2], false, limit)
 				} else {
-					fmt.Println("使用方法: ll <prefixKey> [endKey] -limit=n -pv")
+					fmt.Println("usage: ll <prefixKey> [endKey] -limit=n -pv")
 				}
 			} else if len(cmd) == 5 {
 				if strings.Contains(cmd[4], "-pv") && strings.Contains(cmd[3], "-limit") {
 					split := strings.Split(cmd[3], "=")
 					limit, err := strconv.Atoi(split[1])
 					if err != nil {
-						fmt.Println("输入-limit参数有误")
+						fmt.Println("input -limit err")
 						continue
 					}
 					c.handleListRange(cmd[1], cmd[2], true, limit)
 				} else {
-					fmt.Println("使用方法: ll <prefixKey> [endKey] -limit=n -pv")
+					fmt.Println("usage: ll <prefixKey> [endKey] -limit=n -pv")
 				}
 			} else {
-				fmt.Println("使用方法: ll <prefixKey> [endKey] -limit=n -pv")
+				fmt.Println("usage: ll <prefixKey> [endKey] -limit=n -pv")
 			}
 		case "set":
 			if len(cmd) < 3 {
-				fmt.Println("使用方法: set <key> <value>")
+				fmt.Println("usage: set <key> <value>")
 				continue
 			}
 			c.HandleSet(cmd[1], strings.Join(cmd[2:], " "))
 		case "del":
 			if len(cmd) < 2 {
-				fmt.Println("使用方法: del <key>; del <startKey> <endKey>")
+				fmt.Println("usage: del <key>; del <startKey> <endKey>")
 				continue
 			} else if len(cmd) == 2 {
-				fmt.Printf("是否确认删除 key=%s? (yes/no): \n", cmd[1])
+				fmt.Printf("Are you sure to delete key=%s? (yes/no): \n", cmd[1])
 				var confirm string
 				_, err := fmt.Scan(&confirm)
 				if err != nil {
-					fmt.Printf("读取用户输入失败: %v\n", err)
+					fmt.Printf("input err: %v\n", err)
 					continue
 				}
 				if confirm != "yes" {
@@ -128,12 +128,12 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				maxDuration, _ := strconv.Atoi(cmd[3])
 				c.handleDeleteLock(cmd[1], cmd[2], int64(maxDuration), int64(lockTime))
 			} else {
-				fmt.Println("使用方法: del <key>; del <startKey> <endKey>; del <lockKey> owner maxDuration lockTime")
+				fmt.Println("usage: del <key>; del <startKey> <endKey>; del <lockKey> owner maxDuration lockTime")
 			}
 
 		case "find":
 			if len(cmd) < 4 {
-				fmt.Println("使用方法: find <prefixKey> [endKey] -value=xxx -limit=n -pv")
+				fmt.Println("usage: find <prefixKey> [endKey] -value=xxx -limit=n -pv")
 				continue
 			} else if len(cmd) == 6 && strings.Contains(cmd[5], "pv") {
 				c.findLike(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1], true, utils.Str2int(cmd[4], "-limit="))
@@ -144,13 +144,13 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			} else if len(cmd) == 5 && !strings.Contains(cmd[3], "-pv") {
 				c.findLike(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1], false, utils.Str2int(cmd[4], "-limit="))
 			} else {
-				fmt.Println("使用方法: find <prefixKey> [endKey] -value=xxx -limit=n -pv")
+				fmt.Println("usage: find <prefixKey> [endKey] -value=xxx -limit=n -pv")
 			}
 		case "exit":
 			return
 		case "count":
 			if len(cmd) < 2 {
-				fmt.Println("使用方法: count <prefixKey> [endKey]")
+				fmt.Println("usage: count <prefixKey> [endKey]")
 				continue
 			} else if len(cmd) == 3 && strings.Contains(cmd[2], "-value=") {
 				c.handleCount(cmd[1], "", strings.Split(cmd[2], "-value=")[1])
@@ -159,7 +159,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			} else if len(cmd) == 2 {
 				c.handleCount(cmd[1], "", "")
 			} else {
-				fmt.Println("使用方法: count <prefixKey> [endKey]")
+				fmt.Println("usage: count <prefixKey> [endKey]")
 			}
 		case "version":
 			c.handleVersion()
@@ -171,7 +171,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			}
 
 		default:
-			fmt.Println("可用命令: get, ll, exit, set, del, find, count")
+			fmt.Println("usage: get, ll, exit, set, del, find, count")
 		}
 	}
 }
@@ -179,7 +179,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 func (c *TiKVClient) executeTxn(fn func(txn *transaction.KVTxn) error) error {
 	txn, err := c.Client.Begin()
 	if err != nil {
-		return fmt.Errorf("事务启动失败: %w", err)
+		return fmt.Errorf("transation begin err: %w", err)
 	}
 
 	if err := fn(txn); err != nil {
@@ -188,7 +188,7 @@ func (c *TiKVClient) executeTxn(fn func(txn *transaction.KVTxn) error) error {
 	}
 
 	if err := txn.Commit(context.Background()); err != nil {
-		return fmt.Errorf("事务提交失败: %w", err)
+		return fmt.Errorf("transation commit err: %w", err)
 	}
 	return nil
 }
@@ -202,7 +202,7 @@ func (c *TiKVClient) handleGet(key string) {
 	})
 
 	if err != nil {
-		fmt.Printf("查询失败: %v\n", err)
+		fmt.Printf("get err: %v\n", err)
 		return
 	}
 	fmt.Printf("value = %s\n", string(result))
@@ -218,7 +218,7 @@ func (c *TiKVClient) handleListAll(start string, pv bool) {
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
 		iter, err := txn.Iter([]byte(start), []byte(utils.IncrementLastCharASCII(start)))
 		if err != nil {
-			fmt.Printf("创建迭代器失败: %v\n", err)
+			fmt.Printf("iter err: %v\n", err)
 			return nil
 		}
 		defer iter.Close()
@@ -227,7 +227,7 @@ func (c *TiKVClient) handleListAll(start string, pv bool) {
 		for iter.Valid() {
 			select {
 			case <-sigCh:
-				fmt.Println("\n操作已取消")
+				fmt.Println("\noperation cancelled")
 				return nil
 			default:
 				key := iter.Key()
@@ -243,17 +243,17 @@ func (c *TiKVClient) handleListAll(start string, pv bool) {
 			}
 			count++
 			if err := iter.Next(); err != nil {
-				fmt.Printf("迭代失败: %v\n", err)
+				fmt.Printf("iteration failed: %v\n", err)
 				break
 			}
 
 		}
 		fmt.Println("-------------------")
-		fmt.Printf("共找到 %d 条记录\n", count)
+		fmt.Printf("total: %d\n", count)
 		return nil
 	})
 	if err != nil {
-		fmt.Printf("操作失败: %v\n", err)
+		fmt.Printf("operation failed: %v\n", err)
 		return
 	}
 }
@@ -279,7 +279,7 @@ func (c *TiKVClient) handleListRange(key1, key2 string, pv bool, limit int) {
 		// 左闭右开
 		iter, err := txn.Iter([]byte(key1), []byte(key2))
 		if err != nil {
-			fmt.Printf("创建迭代器失败: %v\n", err)
+			fmt.Printf("iter err: %v\n", err)
 			return err
 		}
 		defer iter.Close()
@@ -291,7 +291,7 @@ func (c *TiKVClient) handleListRange(key1, key2 string, pv bool, limit int) {
 			}
 			select {
 			case <-sigCh:
-				fmt.Println("\n操作已取消")
+				fmt.Println("\noperation cancelled")
 				return nil
 			default:
 				key := iter.Key()
@@ -307,16 +307,16 @@ func (c *TiKVClient) handleListRange(key1, key2 string, pv bool, limit int) {
 			}
 			count++
 			if err := iter.Next(); err != nil {
-				fmt.Printf("迭代失败: %v\n", err)
+				fmt.Printf("iteration failed: %v\n", err)
 				break
 			}
 		}
 		fmt.Println("-------------------")
-		fmt.Printf("共找到 %d 条记录\n", count)
+		fmt.Printf("total: %d\n", count)
 		return nil
 	})
 	if err != nil {
-		fmt.Printf("操作失败: %v\n", err)
+		fmt.Printf("operation failed: %v\n", err)
 		return
 	}
 }
@@ -327,10 +327,10 @@ func (c *TiKVClient) HandleSet(key, value string) {
 	})
 
 	if err != nil {
-		fmt.Printf("操作失败: %v\n", err)
+		fmt.Printf("operation failed: %v\n", err)
 		return
 	}
-	fmt.Println("键值已更新")
+	fmt.Println("updated...")
 }
 
 func (c *TiKVClient) handleDelete(key string) {
@@ -341,17 +341,17 @@ func (c *TiKVClient) handleDelete(key string) {
 		return err
 	})
 	if err != nil {
-		fmt.Println("键值不存在")
+		fmt.Println("key not exist")
 		return
 	}
 	err = c.executeTxn(func(txn *transaction.KVTxn) error {
 		return txn.Delete([]byte(key))
 	})
 	if err != nil {
-		fmt.Printf("删除失败: %v\n", err)
+		fmt.Printf("delete err: %v\n", err)
 		return
 	}
-	fmt.Println("键已删除")
+	fmt.Println("deleted...")
 	if base.GlobalLogger != nil {
 		base.GlobalLogger.Printf("key: %s, value: %s", key, string(result))
 	}
@@ -371,7 +371,7 @@ func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
 		iter, err := txn.Iter([]byte(key1), []byte(key2))
 		if err != nil {
-			fmt.Printf("创建迭代器失败: %v\n", err)
+			fmt.Printf("create iteration err: %v\n", err)
 			return err
 		}
 		defer iter.Close()
@@ -383,7 +383,7 @@ func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
 			}
 			select {
 			case <-sigCh:
-				fmt.Println("\n操作已取消")
+				fmt.Println("\noperation cancelled")
 				return nil
 			default:
 				k := iter.Key()
@@ -400,16 +400,16 @@ func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
 				}
 			}
 			if err := iter.Next(); err != nil {
-				fmt.Printf("迭代失败: %v\n", err)
+				fmt.Printf("iteration failed: %v\n", err)
 				break
 			}
 		}
 		fmt.Println("-------------------")
-		fmt.Printf("共找到 %d 条记录\n", count)
+		fmt.Printf("total: %d\n", count)
 		return nil
 	})
 	if err != nil {
-		fmt.Printf("操作失败: %v\n", err)
+		fmt.Printf("operation failed: %v\n", err)
 		return
 	}
 }
@@ -439,14 +439,14 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 	for {
 		txn, err := c.Client.Begin()
 		if err != nil {
-			fmt.Printf("事务开启失败: %v\n", err)
+			fmt.Printf("transation begin err: %v\n", err)
 			return
 		}
 		defer txn.Rollback()
 
 		iter, err := txn.Iter(startKey, endKey)
 		if err != nil {
-			fmt.Printf("迭代err: %v\n", err)
+			fmt.Printf("iter err: %v\n", err)
 			return
 		}
 		defer iter.Close()
@@ -455,14 +455,14 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 		for iter.Valid() && processedInBatch < batchSize {
 			select {
 			case <-sigCh:
-				fmt.Println("\n操作已取消")
+				fmt.Println("\noperation cancelled")
 				return
 			default:
-				fmt.Printf("是否确认删除 key=%s? (yes/no): \n", iter.Key())
+				fmt.Printf("Are you sure to delete key=%s? (yes/no): \n", iter.Key())
 				var confirm string
 				_, err := fmt.Scan(&confirm)
 				if err != nil {
-					fmt.Printf("读取用户输入失败: %v\n", err)
+					fmt.Printf("input err: %v\n", err)
 					continue
 				}
 				if confirm != "yes" {
@@ -474,11 +474,11 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 				}
 				err = txn.Delete(iter.Key())
 				if err != nil {
-					fmt.Printf("删除key=%s失败: %v\n", iter.Key(), err)
+					fmt.Printf("delete key=%s err: %v\n", iter.Key(), err)
 				} else {
 					deletedTotal++
 					processedInBatch++
-					fmt.Println("键已删除")
+					fmt.Println("deleted...")
 					if base.GlobalLogger != nil {
 						base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
 					}
@@ -494,10 +494,10 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 		if processedInBatch > 0 {
 			err = txn.Commit(context.Background())
 			if err != nil {
-				fmt.Printf("事务提交失败: %v\n", err)
+				fmt.Printf("transation commit err: %v\n", err)
 				return
 			}
-			fmt.Printf("已删除批次: %d, 总计已删除: %d\n", processedInBatch, deletedTotal)
+			fmt.Printf("Batch deleted: %d, Total deleted: %d\n", processedInBatch, deletedTotal)
 
 			if iter.Valid() {
 				startKey = append(iter.Key(), 0)
@@ -509,7 +509,7 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 		}
 	}
 
-	fmt.Println("已删除总计:", deletedTotal, "耗时:", time.Since(startTime))
+	fmt.Println("Total deleted:", deletedTotal, "time consuming:", time.Since(startTime))
 }
 
 func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime int64) {
@@ -524,14 +524,14 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 	for {
 		txn, err := c.Client.Begin()
 		if err != nil {
-			fmt.Printf("事务开启失败: %v\n", err)
+			fmt.Printf("transation begin err: %v\n", err)
 			return
 		}
 		defer txn.Rollback()
 
 		iter, err := txn.Iter([]byte(startKey), []byte(utils.IncrementLastCharASCII(startKey)))
 		if err != nil {
-			fmt.Printf("迭代err: %v\n", err)
+			fmt.Printf("iter err: %v\n", err)
 			return
 		}
 		defer iter.Close()
@@ -541,7 +541,7 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 		for iter.Valid() && processedInBatch < batchSize {
 			select {
 			case <-sigCh:
-				fmt.Println("\n操作已取消")
+				fmt.Println("\noperation cancelled")
 				return
 			default:
 				var result []byte
@@ -553,13 +553,13 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 				var data Data
 				err = json.Unmarshal(result, &data)
 				if err != nil {
-					log.Fatalf("JSON 解析失败: %v", err)
+					log.Fatalf("JSON unmarshal: %v", err)
 				}
 
 				if strings.Compare(data.Owner, owner) == 0 && data.MaxDuration == maxDuration && data.LockTime > lockTime {
 					err = txn.Delete(iter.Key())
 					if err != nil {
-						fmt.Printf("删除key=%s失败: %v\n", iter.Key(), err)
+						fmt.Printf("delete key=%s err: %v\n", iter.Key(), err)
 					} else {
 						deletedTotal++
 						processedInBatch++
@@ -579,15 +579,15 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 		if processedInBatch > 0 {
 			err = txn.Commit(context.Background())
 			if err != nil {
-				fmt.Printf("事务提交失败: %v\n", err)
+				fmt.Printf("transation commit err: %v\n", err)
 				return
 			}
-			fmt.Printf("已删除批次: %d, 总计已删除: %d\n", processedInBatch, deletedTotal)
+			fmt.Printf("Batch deleted: %d, Total deleted: %d\n", processedInBatch, deletedTotal)
 		} else {
 			break
 		}
 	}
-	fmt.Println("已删除总计:", deletedTotal, "耗时:", time.Since(startTime))
+	fmt.Println("Total deleted:", deletedTotal, "time consuming:", time.Since(startTime))
 }
 
 func (c *TiKVClient) handleCount(key1, key2, value string) {
@@ -604,7 +604,7 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
 		iter, err := txn.Iter([]byte(key1), []byte(key2))
 		if err != nil {
-			fmt.Printf("创建迭代器失败: %v\n", err)
+			fmt.Printf("iter err: %v\n", err)
 			return nil
 		}
 		defer iter.Close()
@@ -613,7 +613,7 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 		for iter.Valid() {
 			select {
 			case <-sigCh:
-				fmt.Println("\n操作已取消")
+				fmt.Println("\noperation cancelled")
 				return nil
 			default:
 				key := iter.Key()
@@ -625,7 +625,7 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 
 			}
 			if err := iter.Next(); err != nil {
-				fmt.Printf("迭代失败: %v\n", err)
+				fmt.Printf("iteration failed: %v\n", err)
 				break
 			}
 		}
@@ -633,7 +633,7 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 		return nil
 	})
 	if err != nil {
-		fmt.Printf("操作失败: %v\n", err)
+		fmt.Printf("operation failed: %v\n", err)
 		return
 	}
 
