@@ -594,6 +594,8 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
+	var lastKey []byte
+	var total int
 
 	if key2 == "" {
 		key2 = utils.IncrementLastCharASCII(key1)
@@ -601,20 +603,21 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 		key2 = utils.IncrementLastCharASCII(key2)
 	}
 
-	err := c.executeTxn(func(txn *transaction.KVTxn) error {
+	for {
+		txn, err := c.Client.Begin()
 		iter, err := txn.Iter([]byte(key1), []byte(key2))
 		if err != nil {
 			fmt.Printf("iter err: %v\n", err)
-			return nil
+			return
 		}
 		defer iter.Close()
 
 		var count int
-		for iter.Valid() {
+		for iter.Valid() && count < 10000 {
 			select {
 			case <-sigCh:
 				fmt.Println("\noperation cancelled")
-				return nil
+				return
 			default:
 				key := iter.Key()
 				if value != "" && strings.Contains(string(key), value) {
@@ -622,6 +625,7 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 				} else if value == "" {
 					count++
 				}
+				lastKey = key
 
 			}
 			if err := iter.Next(); err != nil {
@@ -629,12 +633,14 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 				break
 			}
 		}
-		fmt.Println(count)
-		return nil
-	})
-	if err != nil {
-		fmt.Printf("operation failed: %v\n", err)
-		return
+		//fmt.Printf("Processed %d keys in this batch\n", count)
+		total += count
+		if !iter.Valid() {
+			fmt.Println("Total: ", total)
+			return
+		}
+
+		key1 = string(append(lastKey, 0))
 	}
 
 }
