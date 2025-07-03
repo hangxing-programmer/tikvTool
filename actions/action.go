@@ -106,7 +106,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			c.HandleSet(cmd[1], strings.Join(cmd[2:], " "))
 		case "del":
 			if len(cmd) < 2 {
-				fmt.Println("usage: del <key>; del <startKey> <endKey>")
+				fmt.Println("usage: del <key> -nolog; del <startKey> <endKey> -nolog; del <lockKey> owner maxDuration lockTime -nolog")
 				continue
 			} else if len(cmd) == 2 {
 				fmt.Printf("Are you sure to delete key=%s? (yes/no): \n", cmd[1])
@@ -119,16 +119,34 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				if confirm != "yes" {
 					continue
 				} else {
-					c.handleDelete(cmd[1])
+					c.handleDelete(cmd[1], false)
 				}
-			} else if len(cmd) == 3 {
-				c.handleDelRange(cmd[1], cmd[2])
+			} else if len(cmd) == 3 && strings.Contains(cmd[2], "-nolog") {
+				fmt.Printf("Are you sure to delete key=%s? (yes/no): \n", cmd[1])
+				var confirm string
+				_, err := fmt.Scan(&confirm)
+				if err != nil {
+					fmt.Printf("input err: %v\n", err)
+					continue
+				}
+				if confirm != "yes" {
+					continue
+				}
+				c.handleDelete(cmd[1], true)
+			} else if len(cmd) == 3 && !strings.Contains(cmd[2], "-nolog") {
+				c.handleDelRange(cmd[1], cmd[2], false)
+			} else if len(cmd) == 4 && strings.Contains(cmd[3], "-nolog") {
+				c.handleDelRange(cmd[1], cmd[2], true)
 			} else if len(cmd) == 5 {
 				lockTime, _ := strconv.Atoi(cmd[4])
 				maxDuration, _ := strconv.Atoi(cmd[3])
-				c.handleDeleteLock(cmd[1], cmd[2], int64(maxDuration), int64(lockTime))
+				c.handleDeleteLock(cmd[1], cmd[2], int64(maxDuration), int64(lockTime), false)
+			} else if len(cmd) == 6 {
+				lockTime, _ := strconv.Atoi(cmd[4])
+				maxDuration, _ := strconv.Atoi(cmd[3])
+				c.handleDeleteLock(cmd[1], cmd[2], int64(maxDuration), int64(lockTime), true)
 			} else {
-				fmt.Println("usage: del <key>; del <startKey> <endKey>; del <lockKey> owner maxDuration lockTime")
+				fmt.Println("usage: del <key> -nolog; del <startKey> <endKey> -nolog; del <lockKey> owner maxDuration lockTime -nolog")
 			}
 
 		case "find":
@@ -163,12 +181,6 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			}
 		case "version":
 			c.handleVersion()
-		case "delFromTo":
-			if len(cmd) == 1 {
-				c.handleLog(true)
-			} else if len(cmd) == 2 && strings.Contains(cmd[1], "-nolog") {
-				c.handleLog(false)
-			}
 
 		default:
 			fmt.Println("usage: get, ll, exit, set, del, find, count")
@@ -330,7 +342,12 @@ func (c *TiKVClient) HandleSet(key, value string) {
 	fmt.Println("updated...")
 }
 
-func (c *TiKVClient) handleDelete(key string) {
+func (c *TiKVClient) handleDelete(key string, nolog bool) {
+	if nolog {
+		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+	} else {
+		base.GLobalLogFile.Close()
+	}
 	var result []byte
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
 		val, err := txn.Get(context.Background(), []byte(key))
@@ -348,7 +365,7 @@ func (c *TiKVClient) handleDelete(key string) {
 		fmt.Printf("delete err: %v\n", err)
 		return
 	}
-	fmt.Println("deleted...")
+	fmt.Println("deleted")
 	if base.GlobalLogger != nil {
 		base.GlobalLogger.Printf("key: %s, value: %s", key, string(result))
 	}
@@ -411,7 +428,12 @@ func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
 	}
 }
 
-func (c *TiKVClient) handleDelRange(start, end string) {
+func (c *TiKVClient) handleDelRange(start, end string, nolog bool) {
+	if nolog {
+		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+	} else {
+		base.GLobalLogFile.Close()
+	}
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
@@ -455,27 +477,12 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 				fmt.Println("\noperation cancelled")
 				return
 			default:
-				fmt.Printf("Are you sure to delete key=%s? (yes/no): \n", iter.Key())
-				var confirm string
-				_, err := fmt.Scan(&confirm)
-				if err != nil {
-					fmt.Printf("input err: %v\n", err)
-					continue
-				}
-				if confirm != "yes" {
-					if err = iter.Next(); err != nil {
-						fmt.Printf("iter.Next err: %v\n", err)
-						break
-					}
-					continue
-				}
 				err = txn.Delete(iter.Key())
 				if err != nil {
 					fmt.Printf("delete key=%s err: %v\n", iter.Key(), err)
 				} else {
 					deletedTotal++
 					processedInBatch++
-					fmt.Println("deleted...")
 					if base.GlobalLogger != nil {
 						base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
 					}
@@ -489,6 +496,24 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 
 		// 提交当前批次
 		if processedInBatch > 0 {
+			fmt.Printf("Are you sure to delete? (yes/no): \n")
+			var confirm string
+			_, err := fmt.Scan(&confirm)
+			if err != nil {
+				fmt.Printf("input err: %v\n", err)
+				continue
+			}
+			if confirm != "yes" {
+				err = txn.Rollback()
+				if err != nil {
+					fmt.Printf("rollback err: %v\n", err)
+				}
+				if err = iter.Next(); err != nil {
+					fmt.Printf("iter.Next err: %v\n", err)
+					break
+				}
+				continue
+			}
 			err = txn.Commit(context.Background())
 			if err != nil {
 				fmt.Printf("transation commit err: %v\n", err)
@@ -509,7 +534,12 @@ func (c *TiKVClient) handleDelRange(start, end string) {
 	fmt.Println("Total deleted:", deletedTotal, "time consuming:", time.Since(startTime))
 }
 
-func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime int64) {
+func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime int64, nolog bool) {
+	if nolog {
+		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+	} else {
+		base.GLobalLogFile.Close()
+	}
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)

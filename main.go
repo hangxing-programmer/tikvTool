@@ -9,10 +9,13 @@ import (
 	"strings"
 	"tikv/actions"
 	"tikv/base"
+	"tikv/utils"
 )
 
 func main() {
 	//utils.DataAdd()
+
+	base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
 
 	line := liner.NewLiner()
 	defer line.Close()
