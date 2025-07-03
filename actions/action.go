@@ -72,7 +72,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 						continue
 					}
 					c.handleListRange(cmd[1], "", true, limit)
-				} else if strings.Contains(cmd[3], "-limit") && !strings.Contains(cmd[3], "-pv") {
+				} else if strings.Contains(cmd[3], "-limit") {
 					split := strings.Split(cmd[3], "=")
 					limit, err := strconv.Atoi(split[1])
 					if err != nil {
@@ -262,9 +262,6 @@ func (c *TiKVClient) handleListRange(key1, key2 string, pv bool, limit int) {
 
 	// 如果key2为空，则计算key1的下一个键
 	if key2 == "" {
-		if !strings.Contains(key1, "/") {
-			key1 = key1 + "/"
-		}
 		key2 = utils.IncrementLastCharASCII(key1)
 	} else {
 		key2 = utils.IncrementLastCharASCII(key2)
@@ -645,8 +642,8 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 
 }
 
-func (c *TiKVClient) handleVersion() string {
-	return ""
+func (c *TiKVClient) handleVersion() {
+	fmt.Println("1.0.1")
 }
 
 func (c *TiKVClient) handleLog(nolog bool) {
