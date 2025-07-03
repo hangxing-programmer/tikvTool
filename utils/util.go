@@ -19,6 +19,44 @@ func Int2Str(num int) string {
 	return strconv.Itoa(num)
 }
 
+func ContainLimit(strs []string) (bool, int) {
+	for _, str := range strs {
+		if strings.Contains(str, "limit") {
+			ss := strings.Split(str, "-limit=")
+			limit, _ := strconv.Atoi(ss[1])
+			return true, limit
+		}
+	}
+	return false, -1
+}
+
+func ContainPv(strs []string) bool {
+	for _, str := range strs {
+		if strings.Contains(str, "pv") {
+			return true
+		}
+	}
+	return false
+}
+
+func ContainValue(strs []string) (bool, string) {
+	for _, str := range strs {
+		if strings.Contains(str, "value") {
+			ss := strings.Split(str, "-value=")
+
+			return true, ss[1]
+		}
+	}
+	return false, ""
+}
+func ContainNolog(strs []string) bool {
+	for _, str := range strs {
+		if strings.Contains(str, "nolog") {
+			return true
+		}
+	}
+	return false
+}
 func IncrementLastCharASCII(s string) string {
 	if len(s) == 0 {
 		return s // 如果字符串为空，直接返回

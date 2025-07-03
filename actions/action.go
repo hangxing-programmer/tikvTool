@@ -53,44 +53,28 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			}
 			c.handleGet(cmd[1])
 		case "ll":
+			containLimit, limit := utils.ContainLimit(cmd)
+			containPv := utils.ContainPv(cmd)
 			if len(cmd) == 2 {
 				c.handleListAll(cmd[1], false)
 			} else if len(cmd) == 3 { // 提供前缀,有value
-				if cmd[2] == "-pv" {
+				if containPv {
 					c.handleListAll(cmd[1], true)
-				} else if len(cmd) == 3 && strings.Contains(cmd[2], "-limit=") {
-					c.handleListRange(cmd[1], "", false, utils.Str2int(cmd[2], "-limit="))
+				} else if len(cmd) == 3 && containLimit {
+					c.handleListRange(cmd[1], "", false, limit)
 				} else {
 					c.handleListRange(cmd[1], cmd[2], false, -1)
 				}
 			} else if len(cmd) == 4 { // 有参数时范围读取,有value
-				if strings.Contains(cmd[2], "-limit") && strings.Contains(cmd[3], "-pv") {
-					split := strings.Split(cmd[2], "=")
-					limit, err := strconv.Atoi(split[1])
-					if err != nil {
-						fmt.Println("input -limit err")
-						continue
-					}
+				if containLimit && containPv {
 					c.handleListRange(cmd[1], "", true, limit)
-				} else if strings.Contains(cmd[3], "-limit") {
-					split := strings.Split(cmd[3], "=")
-					limit, err := strconv.Atoi(split[1])
-					if err != nil {
-						fmt.Println("input -limit err")
-						continue
-					}
+				} else if containLimit && !containPv {
 					c.handleListRange(cmd[1], cmd[2], false, limit)
 				} else {
 					fmt.Println("usage: ll <prefixKey> [endKey] -limit=n -pv")
 				}
 			} else if len(cmd) == 5 {
-				if strings.Contains(cmd[4], "-pv") && strings.Contains(cmd[3], "-limit") {
-					split := strings.Split(cmd[3], "=")
-					limit, err := strconv.Atoi(split[1])
-					if err != nil {
-						fmt.Println("input -limit err")
-						continue
-					}
+				if containPv && containLimit {
 					c.handleListRange(cmd[1], cmd[2], true, limit)
 				} else {
 					fmt.Println("usage: ll <prefixKey> [endKey] -limit=n -pv")
@@ -105,6 +89,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			}
 			c.HandleSet(cmd[1], strings.Join(cmd[2:], " "))
 		case "del":
+			containNolog := utils.ContainNolog(cmd)
 			if len(cmd) < 2 {
 				fmt.Println("usage: del <key> -nolog; del <startKey> <endKey> -nolog; del <lockKey> owner maxDuration lockTime -nolog")
 				continue
@@ -121,7 +106,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				} else {
 					c.handleDelete(cmd[1], false)
 				}
-			} else if len(cmd) == 3 && strings.Contains(cmd[2], "-nolog") {
+			} else if len(cmd) == 3 && containNolog {
 				fmt.Printf("Are you sure to delete key=%s? (yes/no): \n", cmd[1])
 				var confirm string
 				_, err := fmt.Scan(&confirm)
@@ -132,35 +117,46 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				if confirm != "yes" {
 					continue
 				}
-				c.handleDelete(cmd[1], true)
-			} else if len(cmd) == 3 && !strings.Contains(cmd[2], "-nolog") {
-				c.handleDelRange(cmd[1], cmd[2], false)
-			} else if len(cmd) == 4 && strings.Contains(cmd[3], "-nolog") {
+				c.handleDelete(cmd[1], false)
+			} else if len(cmd) == 3 && !containNolog {
 				c.handleDelRange(cmd[1], cmd[2], true)
+			} else if len(cmd) == 4 && containNolog {
+				c.handleDelRange(cmd[1], cmd[2], false)
 			} else if len(cmd) == 5 {
 				lockTime, _ := strconv.Atoi(cmd[4])
 				maxDuration, _ := strconv.Atoi(cmd[3])
-				c.handleDeleteLock(cmd[1], cmd[2], int64(maxDuration), int64(lockTime), false)
-			} else if len(cmd) == 6 {
+				c.handleDeleteLock(cmd[1], cmd[2], int64(maxDuration), int64(lockTime), true)
+			} else if len(cmd) == 6 && containNolog {
 				lockTime, _ := strconv.Atoi(cmd[4])
 				maxDuration, _ := strconv.Atoi(cmd[3])
-				c.handleDeleteLock(cmd[1], cmd[2], int64(maxDuration), int64(lockTime), true)
+				c.handleDeleteLock(cmd[1], cmd[2], int64(maxDuration), int64(lockTime), false)
 			} else {
 				fmt.Println("usage: del <key> -nolog; del <startKey> <endKey> -nolog; del <lockKey> owner maxDuration lockTime -nolog")
 			}
 
 		case "find":
-			if len(cmd) < 4 {
+			containLimit, limit := utils.ContainLimit(cmd)
+			containPv := utils.ContainPv(cmd)
+			containValue, value := utils.ContainValue(cmd)
+			if len(cmd) < 3 {
 				fmt.Println("usage: find <prefixKey> [endKey] -value=xxx -limit=n -pv")
 				continue
-			} else if len(cmd) == 6 && strings.Contains(cmd[5], "pv") {
-				c.findLike(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1], true, utils.Str2int(cmd[4], "-limit="))
-			} else if len(cmd) == 4 && strings.Contains(cmd[3], "-limit") {
-				c.findLike(cmd[1], "", strings.Split(cmd[2], "-value=")[1], false, utils.Str2int(cmd[3], "-limit="))
-			} else if len(cmd) == 5 && strings.Contains(cmd[3], "-limit") && strings.Contains(cmd[4], "-pv") {
-				c.findLike(cmd[1], "", strings.Split(cmd[2], "-value=")[1], true, utils.Str2int(cmd[3], "-limit="))
-			} else if len(cmd) == 5 && !strings.Contains(cmd[3], "-pv") {
-				c.findLike(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1], false, utils.Str2int(cmd[4], "-limit="))
+			} else if len(cmd) == 3 && containValue {
+				c.findLike(cmd[1], "", value, false, -1)
+			} else if len(cmd) == 6 && containPv && containLimit && containValue {
+				c.findLike(cmd[1], cmd[2], value, true, limit)
+			} else if len(cmd) == 4 && containLimit && containValue {
+				c.findLike(cmd[1], "", value, false, limit)
+			} else if len(cmd) == 4 && containValue && !containPv {
+				c.findLike(cmd[1], "", value, false, -1)
+			} else if len(cmd) == 4 && containValue && containPv {
+				c.findLike(cmd[1], "", value, true, -1)
+			} else if len(cmd) == 5 && containLimit && containPv && containValue {
+				c.findLike(cmd[1], "", value, true, limit)
+			} else if len(cmd) == 5 && !containPv && containLimit && containValue {
+				c.findLike(cmd[1], cmd[2], value, false, limit)
+			} else if len(cmd) == 5 && !containLimit && containPv && containValue {
+				c.findLike(cmd[1], cmd[2], value, true, -1)
 			} else {
 				fmt.Println("usage: find <prefixKey> [endKey] -value=xxx -limit=n -pv")
 			}
@@ -183,7 +179,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			c.handleVersion()
 
 		default:
-			fmt.Println("usage: get, ll, exit, set, del, find, count")
+			fmt.Println("usage: get, ll, exit, set, del, find, count, version")
 		}
 	}
 }
@@ -455,6 +451,17 @@ func (c *TiKVClient) handleDelRange(start, end string, nolog bool) {
 	startKey := []byte(start)
 	endKey := []byte(utils.IncrementLastCharASCII(end))
 
+	fmt.Printf("Are you sure to delete? (yes/no): \n")
+	var confirm string
+	_, err := fmt.Scan(&confirm)
+	if err != nil {
+		fmt.Printf("input err: %v\n", err)
+		return
+	}
+	if confirm != "yes" {
+		return
+	}
+
 	for {
 		txn, err := c.Client.Begin()
 		if err != nil {
@@ -496,24 +503,6 @@ func (c *TiKVClient) handleDelRange(start, end string, nolog bool) {
 
 		// 提交当前批次
 		if processedInBatch > 0 {
-			fmt.Printf("Are you sure to delete? (yes/no): \n")
-			var confirm string
-			_, err := fmt.Scan(&confirm)
-			if err != nil {
-				fmt.Printf("input err: %v\n", err)
-				continue
-			}
-			if confirm != "yes" {
-				err = txn.Rollback()
-				if err != nil {
-					fmt.Printf("rollback err: %v\n", err)
-				}
-				if err = iter.Next(); err != nil {
-					fmt.Printf("iter.Next err: %v\n", err)
-					break
-				}
-				continue
-			}
 			err = txn.Commit(context.Background())
 			if err != nil {
 				fmt.Printf("transation commit err: %v\n", err)
@@ -547,6 +536,17 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 	startTime := time.Now()
 
 	startKey := key + "/Data/Lock"
+
+	fmt.Printf("Are you sure to delete? (yes/no): \n")
+	var confirm string
+	_, err := fmt.Scan(&confirm)
+	if err != nil {
+		fmt.Printf("input err: %v\n", err)
+		return
+	}
+	if confirm != "yes" {
+		return
+	}
 
 	for {
 		txn, err := c.Client.Begin()
