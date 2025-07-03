@@ -163,13 +163,14 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 		case "exit":
 			return
 		case "count":
+			containValue, value := utils.ContainValue(cmd)
 			if len(cmd) < 2 {
 				fmt.Println("usage: count <prefixKey> [endKey]")
 				continue
-			} else if len(cmd) == 3 && strings.Contains(cmd[2], "-value=") {
-				c.handleCount(cmd[1], "", strings.Split(cmd[2], "-value=")[1])
-			} else if len(cmd) == 4 && strings.Contains(cmd[3], "-value=") {
-				c.handleCount(cmd[1], cmd[2], strings.Split(cmd[3], "-value=")[1])
+			} else if len(cmd) == 3 && containValue {
+				c.handleCount(cmd[1], "", value)
+			} else if len(cmd) == 4 && containValue {
+				c.handleCount(cmd[1], cmd[2], value)
 			} else if len(cmd) == 2 {
 				c.handleCount(cmd[1], "", "")
 			} else {
