@@ -49,6 +49,7 @@ func ContainValue(strs []string) (bool, string) {
 	}
 	return false, ""
 }
+
 func ContainNolog(strs []string) bool {
 	for _, str := range strs {
 		if strings.Contains(str, "nolog") {
@@ -57,17 +58,18 @@ func ContainNolog(strs []string) bool {
 	}
 	return false
 }
+
 func IncrementLastCharASCII(s string) string {
 	if len(s) == 0 {
-		return s // 如果字符串为空，直接返回
+		return s
 	}
-	// 将字符串转换为字节切片
+
 	b := []byte(s)
+	lastChar := b[len(b)-1]
 	// 检查最后一个字符是否为最大值
-	if b[len(b)-1] == '\xff' || b[len(b)-1] == 'z' {
-		return string(b)
-	} else {
-		// 如果不是最大值，直接加 1
+	if (lastChar >= 'a' && lastChar < 'z') ||
+		(lastChar >= 'A' && lastChar < 'Z') ||
+		(lastChar >= '0' && lastChar < '9') {
 		b[len(b)-1]++
 	}
 	return string(b)
