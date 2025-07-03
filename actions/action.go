@@ -104,7 +104,7 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				if confirm != "yes" {
 					continue
 				} else {
-					c.handleDelete(cmd[1], false)
+					c.handleDelete(cmd[1], true)
 				}
 			} else if len(cmd) == 3 && containNolog {
 				fmt.Printf("Are you sure to delete key=%s? (yes/no): \n", cmd[1])
