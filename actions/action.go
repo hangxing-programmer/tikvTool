@@ -74,6 +74,8 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 					c.handleListRange(cmd[1], "", true, limit)
 				} else if containLimit && !containPv {
 					c.handleListRange(cmd[1], cmd[2], false, limit)
+				} else if !containLimit && containPv {
+					c.handleListRange(cmd[1], cmd[2], true, -1)
 				} else {
 					fmt.Println("usage: ll <prefixKey> [endKey] -limit=n -pv")
 				}
@@ -768,7 +770,7 @@ func (c *TiKVClient) handleFindDelete(key1, key2, value string, limit int, nolog
 				fmt.Println("\noperation cancelled")
 				return
 			default:
-				if strings.Contains(string(iter.Key()), value) {
+				if strings.Contains(string(iter.Value()), value) {
 					err = txn.Delete(iter.Key())
 					if err != nil {
 						fmt.Printf("delete key=%s err: %v\n", iter.Key(), err)
