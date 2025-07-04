@@ -96,5 +96,5 @@ func InitLog() (*log.Logger, *os.File, error) {
 		return nil, logFile, fmt.Errorf("open log file err: %v", err)
 	}
 
-	return log.New(logFile, "", log.LstdFlags), logFile, nil
+	return log.New(logFile, " [INFO] ", log.LstdFlags), logFile, nil
 }
