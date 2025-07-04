@@ -246,8 +246,8 @@ func (c *TiKVClient) handleGet(key string) {
 		return err
 	})
 
-	if err != nil {
-		fmt.Printf("get err: %v\n", err)
+	if err != nil && strings.Contains(err.Error(), "not exist") {
+		fmt.Printf("key:%s  not exist", key)
 		return
 	}
 	fmt.Printf("value = %s\n", string(result))
@@ -372,7 +372,7 @@ func (c *TiKVClient) HandleSet(key, value string) {
 		fmt.Printf("operation failed: %v\n", err)
 		return
 	}
-	fmt.Println("updated...")
+	fmt.Println("updated")
 }
 
 func (c *TiKVClient) handleDelete(key string, nolog bool) {
