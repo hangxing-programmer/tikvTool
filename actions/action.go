@@ -94,7 +94,11 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			c.HandleSet(cmd[1], strings.Join(cmd[2:], " "))
 		case "del":
 			containNolog := utils.ContainNolog(cmd)
+			containLimit, _ := utils.ContainLimit(cmd)
 			if len(cmd) < 2 {
+				fmt.Println("usage: del <key> -nolog; del <startKey> <endKey> -nolog; del <lockKey> owner maxDuration lockTime -nolog")
+				continue
+			} else if containLimit {
 				fmt.Println("usage: del <key> -nolog; del <startKey> <endKey> -nolog; del <lockKey> owner maxDuration lockTime -nolog")
 				continue
 			} else if len(cmd) == 2 {
@@ -753,7 +757,7 @@ func (c *TiKVClient) handleFindDelete(key1, key2, value string, limit int, nolog
 		}
 		defer iter.Close()
 
-		batchSize := 1000
+		batchSize := 3000
 		processedInBatch := 0
 		for iter.Valid() && processedInBatch < batchSize {
 			if deletedTotal >= limit && limit > 0 {
