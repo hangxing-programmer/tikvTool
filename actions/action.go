@@ -598,7 +598,7 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 		}
 		defer iter.Close()
 
-		batchSize := 1000
+		batchSize := 3000
 		processedInBatch := 0
 		for iter.Valid() && processedInBatch < batchSize {
 			select {
