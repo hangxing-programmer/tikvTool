@@ -433,12 +433,12 @@ func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
 			default:
 				k := iter.Key()
 				v := iter.Value()
-				if pv && strings.Contains(string(k), value) {
+				if pv && strings.Contains(string(v), value) {
 					fmt.Printf("%s", string(k))
 					fmt.Printf("  Value = %s\n", string(v))
 					count++
 				} else {
-					if strings.Contains(string(k), value) {
+					if strings.Contains(string(v), value) {
 						fmt.Printf("%s\n", string(k))
 						count++
 					}
