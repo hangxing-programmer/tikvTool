@@ -682,7 +682,7 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 				return
 			default:
 				key := iter.Key()
-				if value != "" && strings.Contains(string(key), value) {
+				if value != "" && strings.Contains(string(iter.Value()), value) {
 					count++
 				} else if value == "" {
 					count++
