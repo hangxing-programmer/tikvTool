@@ -13,7 +13,7 @@ import (
 )
 
 func start() {
-	base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+	base.GlobalLogger, base.GlobalLogFile, _ = utils.InitLog()
 
 	line := liner.NewLiner()
 	defer line.Close()
@@ -42,7 +42,7 @@ func start() {
 	cli := &actions.TiKVClient{client}
 	cli.StartCmd(line)
 
-	defer base.GLobalLogFile.Close()
+	defer base.GlobalLogFile.Close()
 }
 func main() {
 	//utils.DataAdd()

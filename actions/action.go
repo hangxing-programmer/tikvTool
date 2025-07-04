@@ -377,9 +377,9 @@ func (c *TiKVClient) HandleSet(key, value string) {
 
 func (c *TiKVClient) handleDelete(key string, nolog bool) {
 	if nolog {
-		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+		base.GlobalLogger, base.GlobalLogFile, _ = utils.InitLog()
 	} else {
-		base.GLobalLogFile.Close()
+		base.GlobalLogFile.Close()
 	}
 	var result []byte
 	err := c.executeTxn(func(txn *transaction.KVTxn) error {
@@ -463,9 +463,9 @@ func (c *TiKVClient) findLike(key1, key2, value string, pv bool, limit int) {
 
 func (c *TiKVClient) handleDelRange(start, end string, nolog bool) {
 	if nolog {
-		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+		base.GlobalLogger, base.GlobalLogFile, _ = utils.InitLog()
 	} else {
-		base.GLobalLogFile.Close()
+		base.GlobalLogFile.Close()
 	}
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -562,9 +562,9 @@ func (c *TiKVClient) handleDelRange(start, end string, nolog bool) {
 
 func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime int64, nolog bool) {
 	if nolog {
-		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+		base.GlobalLogger, base.GlobalLogFile, _ = utils.InitLog()
 	} else {
-		base.GLobalLogFile.Close()
+		base.GlobalLogFile.Close()
 	}
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -715,9 +715,9 @@ func (c *TiKVClient) handleVersion() {
 
 func (c *TiKVClient) handleFindDelete(key1, key2, value string, limit int, nolog bool) {
 	if nolog {
-		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+		base.GlobalLogger, base.GlobalLogFile, _ = utils.InitLog()
 	} else {
-		base.GLobalLogFile.Close()
+		base.GlobalLogFile.Close()
 	}
 
 	sigCh := make(chan os.Signal, 1)
@@ -807,9 +807,9 @@ func (c *TiKVClient) handleFindDelete(key1, key2, value string, limit int, nolog
 
 func (c *TiKVClient) handleLog(nolog bool) {
 	if nolog {
-		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+		base.GlobalLogger, base.GlobalLogFile, _ = utils.InitLog()
 	} else {
-		base.GLobalLogFile.Close()
+		base.GlobalLogFile.Close()
 	}
 
 }

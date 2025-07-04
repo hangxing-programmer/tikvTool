@@ -7,5 +7,5 @@ import (
 
 var (
 	GlobalLogger  *log.Logger
-	GLobalLogFile *os.File
+	GlobalLogFile *os.File
 )
