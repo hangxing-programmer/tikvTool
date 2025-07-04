@@ -546,7 +546,7 @@ func (c *TiKVClient) handleDelRange(start, end string, nolog bool) {
 			fmt.Printf("Batch deleted: %d, Total deleted: %d\n", processedInBatch, deletedTotal)
 
 			if iter.Valid() {
-				startKey = append(iter.Key(), 0)
+				startKey = iter.Key()
 			} else {
 				break
 			}
