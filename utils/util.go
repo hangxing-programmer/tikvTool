@@ -60,19 +60,31 @@ func ContainNolog(strs []string) bool {
 }
 
 func IncrementLastCharASCII(s string) string {
-	if len(s) == 0 {
-		return s
+	//if len(s) == 0 {
+	//	return s
+	//}
+	//
+	//b := []byte(s)
+	//lastChar := b[len(b)-1]
+	//// 检查最后一个字符是否为最大值
+	//if (lastChar >= 'a' && lastChar < 'z') ||
+	//	(lastChar >= 'A' && lastChar < 'Z') ||
+	//	(lastChar >= '0' && lastChar < '9') {
+	//	b[len(b)-1]++
+	//}
+	//return string(b)
+	i := len(s) - 1
+	for i >= 0 && s[i] >= '0' && s[i] <= '9' {
+		i--
+	}
+	if i == len(s)-1 { // 没有数字后缀
+		return s + "1"
 	}
 
-	b := []byte(s)
-	lastChar := b[len(b)-1]
-	// 检查最后一个字符是否为最大值
-	if (lastChar >= 'a' && lastChar < 'z') ||
-		(lastChar >= 'A' && lastChar < 'Z') ||
-		(lastChar >= '0' && lastChar < '9') {
-		b[len(b)-1]++
-	}
-	return string(b)
+	prefix := s[:i+1]
+	numStr := s[i+1:]
+	num, _ := strconv.Atoi(numStr)
+	return prefix + strconv.Itoa(num+1)
 }
 
 func InitLog() (*log.Logger, *os.File, error) {
