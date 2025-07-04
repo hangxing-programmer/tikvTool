@@ -177,6 +177,8 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 				c.handleCount(cmd[1], cmd[2], value)
 			} else if len(cmd) == 2 {
 				c.handleCount(cmd[1], "", "")
+			} else if len(cmd) == 3 && !containValue {
+				c.handleCount(cmd[1], cmd[2], "")
 			} else {
 				fmt.Println("usage: count <prefixKey> [endKey]")
 			}
