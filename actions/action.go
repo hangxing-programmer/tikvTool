@@ -28,6 +28,8 @@ type Data struct {
 	MaxDuration int64  `json:"maxDuration"`
 }
 
+var cmdStr []string
+
 func (c *TiKVClient) StartCmd(line *liner.State) {
 	for {
 		input, err := line.Prompt("TiKVClient> ")
@@ -44,6 +46,8 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 		if len(cmd) == 0 {
 			continue
 		}
+
+		cmdStr = cmd
 
 		switch cmd[0] {
 		case "get":
@@ -178,9 +182,33 @@ func (c *TiKVClient) StartCmd(line *liner.State) {
 			}
 		case "version":
 			c.handleVersion()
-
+		case "fd":
+			containLimit, limit := utils.ContainLimit(cmd)
+			containValue, value := utils.ContainValue(cmd)
+			containNolog := utils.ContainNolog(cmd)
+			if len(cmd) < 3 {
+				fmt.Println("usage: fd <prefixKey> [endKey] -value=xxx -limit=n -nolog")
+			} else if len(cmd) == 3 && containValue && !containLimit && !containNolog {
+				c.handleFindDelete(cmd[1], "", value, -1, true)
+			} else if len(cmd) == 4 && containValue && containLimit && !containNolog {
+				c.handleFindDelete(cmd[1], "", value, limit, true)
+			} else if len(cmd) == 4 && containValue && !containLimit && containNolog {
+				c.handleFindDelete(cmd[1], "", value, -1, false)
+			} else if len(cmd) == 4 && containValue && !containLimit && !containNolog {
+				c.handleFindDelete(cmd[1], cmd[2], value, -1, true)
+			} else if len(cmd) == 5 && containValue && containLimit && containNolog {
+				c.handleFindDelete(cmd[1], "", value, limit, false)
+			} else if len(cmd) == 5 && containValue && !containLimit && containNolog {
+				c.handleFindDelete(cmd[1], cmd[2], value, -1, false)
+			} else if len(cmd) == 5 && containValue && containLimit && !containNolog {
+				c.handleFindDelete(cmd[1], cmd[2], value, limit, true)
+			} else if len(cmd) == 6 && containValue && containLimit && containNolog {
+				c.handleFindDelete(cmd[1], cmd[2], value, limit, false)
+			} else {
+				fmt.Println("usage: fd <prefixKey> [endKey] -value=xxx -limit=n -nolog")
+			}
 		default:
-			fmt.Println("usage: get, ll, exit, set, del, find, count, version")
+			fmt.Println("usage: get, ll, exit, set, del, find, count, version, fd")
 		}
 	}
 }
@@ -364,7 +392,7 @@ func (c *TiKVClient) handleDelete(key string, nolog bool) {
 	}
 	fmt.Println("deleted")
 	if base.GlobalLogger != nil {
-		base.GlobalLogger.Printf("key: %s, value: %s", key, string(result))
+		base.GlobalLogger.Printf("key : %s, value : %s, cmd : %s", key, string(result), cmdStr)
 	}
 }
 
@@ -492,7 +520,7 @@ func (c *TiKVClient) handleDelRange(start, end string, nolog bool) {
 					deletedTotal++
 					processedInBatch++
 					if base.GlobalLogger != nil {
-						base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
+						base.GlobalLogger.Printf("key : %s, value : %s, cmd : %s ", string(iter.Key()), string(iter.Value()), cmdStr)
 					}
 				}
 				if err = iter.Next(); err != nil {
@@ -592,7 +620,7 @@ func (c *TiKVClient) handleDeleteLock(key, owner string, maxDuration, lockTime i
 						deletedTotal++
 						processedInBatch++
 						if base.GlobalLogger != nil {
-							base.GlobalLogger.Printf("key: %s, value: %s", string(iter.Key()), string(iter.Value()))
+							base.GlobalLogger.Printf("key : %s, value : %s, cmd : %s", string(iter.Key()), string(iter.Value()), cmdStr)
 						}
 					}
 				}
@@ -675,6 +703,98 @@ func (c *TiKVClient) handleCount(key1, key2, value string) {
 
 func (c *TiKVClient) handleVersion() {
 	fmt.Println("1.0.1")
+}
+
+func (c *TiKVClient) handleFindDelete(key1, key2, value string, limit int, nolog bool) {
+	if nolog {
+		base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
+	} else {
+		base.GLobalLogFile.Close()
+	}
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+
+	if key2 == "" {
+		key2 = utils.IncrementLastCharASCII(key1)
+	} else {
+		key2 = utils.IncrementLastCharASCII(key2)
+	}
+
+	deletedTotal := 0
+	startTime := time.Now()
+
+	fmt.Printf("Are you sure to delete? (yes/no): \n")
+	var confirm string
+	_, err := fmt.Scan(&confirm)
+	if err != nil {
+		fmt.Printf("input err: %v\n", err)
+		return
+	}
+	if confirm != "yes" {
+		return
+	}
+
+	for {
+		txn, err := c.Client.Begin()
+		if err != nil {
+			fmt.Printf("transation begin err: %v\n", err)
+			return
+		}
+		defer txn.Rollback()
+
+		iter, err := txn.Iter([]byte(key1), []byte(utils.IncrementLastCharASCII(key2)))
+		if err != nil {
+			fmt.Printf("iter err: %v\n", err)
+			return
+		}
+		defer iter.Close()
+
+		batchSize := 1000
+		processedInBatch := 0
+		for iter.Valid() && processedInBatch < batchSize {
+			if deletedTotal >= limit && limit > 0 {
+				break
+			}
+			select {
+			case <-sigCh:
+				fmt.Println("\noperation cancelled")
+				return
+			default:
+				if strings.Contains(string(iter.Key()), value) {
+					err = txn.Delete(iter.Key())
+					if err != nil {
+						fmt.Printf("delete key=%s err: %v\n", iter.Key(), err)
+					} else {
+						deletedTotal++
+						processedInBatch++
+						if base.GlobalLogger != nil {
+							base.GlobalLogger.Printf("key : %s, value : %s, cmd : %s", string(iter.Key()), string(iter.Value()), cmdStr)
+						}
+					}
+				}
+				if err = iter.Next(); err != nil {
+					fmt.Printf("iter.Next err: %v\n", err)
+					break
+				}
+			}
+		}
+
+		// 提交当前批次
+		if processedInBatch > 0 {
+			err = txn.Commit(context.Background())
+			if err != nil {
+				fmt.Printf("transation commit err: %v\n", err)
+				return
+			}
+			fmt.Printf("Batch deleted: %d, Total deleted: %d\n", processedInBatch, deletedTotal)
+		} else {
+			break
+		}
+	}
+
+	fmt.Println("Total deleted:", deletedTotal, "time consuming:", time.Since(startTime))
 }
 
 func (c *TiKVClient) handleLog(nolog bool) {

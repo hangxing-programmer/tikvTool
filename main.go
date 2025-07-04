@@ -12,9 +12,7 @@ import (
 	"tikv/utils"
 )
 
-func main() {
-	//utils.DataAdd()
-
+func start() {
 	base.GlobalLogger, base.GLobalLogFile, _ = utils.InitLog()
 
 	line := liner.NewLiner()
@@ -38,11 +36,22 @@ func main() {
 		fmt.Printf("connect to tikv err:", err)
 		return
 	}
-	fmt.Println("successful connected...")
+	fmt.Println("successful connected")
 
 	// 初始化命令行界面
 	cli := &actions.TiKVClient{client}
 	cli.StartCmd(line)
 
 	defer base.GLobalLogFile.Close()
+}
+func main() {
+	//utils.DataAdd()
+	// 设置全局 panic 处理
+	//defer func() {
+	//	if err := recover(); err != nil {
+	//		fmt.Println("input parms err:", err)
+	//		// 可以在这里进行错误上报、资源清理等操作
+	//	}
+	//}()
+	start()
 }

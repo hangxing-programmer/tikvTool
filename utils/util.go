@@ -22,7 +22,7 @@ func Int2Str(num int) string {
 func ContainLimit(strs []string) (bool, int) {
 	for _, str := range strs {
 		if strings.Contains(str, "limit") {
-			ss := strings.Split(str, "-limit=")
+			ss := strings.Split(str, "limit=")
 			limit, _ := strconv.Atoi(ss[1])
 			return true, limit
 		}
@@ -42,7 +42,7 @@ func ContainPv(strs []string) bool {
 func ContainValue(strs []string) (bool, string) {
 	for _, str := range strs {
 		if strings.Contains(str, "value") {
-			ss := strings.Split(str, "-value=")
+			ss := strings.Split(str, "value=")
 
 			return true, ss[1]
 		}
