@@ -247,7 +247,7 @@ func (c *TiKVClient) handleGet(key string) {
 	})
 
 	if err != nil && strings.Contains(err.Error(), "not exist") {
-		fmt.Printf("key:%s  not exist", key)
+		fmt.Printf("key:%s  not exist\n", key)
 		return
 	}
 	fmt.Printf("value = %s\n", string(result))

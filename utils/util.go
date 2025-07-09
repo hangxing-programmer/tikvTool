@@ -21,6 +21,7 @@ func Int2Str(num int) string {
 
 func ContainLimit(strs []string) (bool, int) {
 	for _, str := range strs {
+		str = strings.ToLower(str)
 		if strings.Contains(str, "limit") {
 			ss := strings.Split(str, "limit=")
 			limit, _ := strconv.Atoi(ss[1])
@@ -32,6 +33,7 @@ func ContainLimit(strs []string) (bool, int) {
 
 func ContainPv(strs []string) bool {
 	for _, str := range strs {
+		str = strings.ToLower(str)
 		if strings.Contains(str, "pv") {
 			return true
 		}
@@ -41,6 +43,7 @@ func ContainPv(strs []string) bool {
 
 func ContainValue(strs []string) (bool, string) {
 	for _, str := range strs {
+		str = strings.ToLower(str)
 		if strings.Contains(str, "value") {
 			ss := strings.Split(str, "value=")
 
@@ -52,6 +55,7 @@ func ContainValue(strs []string) (bool, string) {
 
 func ContainNolog(strs []string) bool {
 	for _, str := range strs {
+		str = strings.ToLower(str)
 		if strings.Contains(str, "nolog") {
 			return true
 		}
